@@ -1,0 +1,16 @@
+name: vit_small_patch16_224
+model_name: vit_pretrained_cifar100
+pretrained: true
+feature_dim: 384
+freeze_backbone: true
+type: vision_transformer_classification
+location: /content/drive/MyDrive/vit_pretraining/checkpoints
+model_filename: vit_final_checkpoint.pth
+num_classes: 80 # This ViT is trained on a reduced class count for OOD purposes.
+
+# vit_small_patch16_224
+checkpoint_keys:
+  class_info: class_info
+  pretrain_classes: pretrain_classes
+  pretrain_examples: pretrain_examples
+  model_state_dict: model_state_dict

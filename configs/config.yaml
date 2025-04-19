@@ -1,0 +1,16 @@
+# Hydra base configuration file
+
+defaults:
+  - _self_
+  - model: model
+  - data: cifar100
+
+# General
+seed: 42 # random seed for reproducability
+num_workers: 4 # number of workers for dataloader
+device: cpu # CHANGE
+output_dir: /content/drive/MyDrive/ms_project/results/ # Change this to your own path
+# save_model: false # save the model after training
+
+experiment:
+  name: ${model.name}_${data.name}

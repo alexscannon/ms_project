@@ -1,0 +1,3 @@
+model_location: /content/drive/MyDrive/data/
+dataset_cifar100_location: /content/drive/MyDrive/data/cifar100/
+dataset_tinyimagenet_location: /content/drive/MyDrive/data/tinyimagenet/

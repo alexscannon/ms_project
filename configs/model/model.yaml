@@ -1,0 +1,6 @@
+defaults:
+  - backbone: vit_pretrained_cifar100
+  - ood: energy
+  - adapter: lora
+
+pretrained: true

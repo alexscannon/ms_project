@@ -1,0 +1,7 @@
+# Create a ".env" file and copy below contents over
+
+# Weights and Biases Credentials
+WANDB_API_KEY='XXXXXXX'
+PROJECT_NAME='XXXXXX'
+TEAM_NAME='XXXXXXX'
+GH_TOKEN='XXXXXXXX'

@@ -1,0 +1,8 @@
+name: cifar100
+channels: 3
+image_size: 32
+num_classes: 100
+mean: [0.5071, 0.4867, 0.4408]
+std: [0.2675, 0.2565, 0.2761]
+
+location: /content/drive/MyDrive/data/cifar100/
