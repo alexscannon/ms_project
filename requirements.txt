@@ -2,10 +2,15 @@
 torch>=1.9.0
 torchvision>=0.10.0
 numpy>=1.20.0,<2.0.0
+# scikit-learn>=0.24.0
+# torchmetrics>=0.8.0  # PyTorch metrics collection for ML
+
 
 # Configuration Management
 hydra-core>=1.1.0
 omegaconf>=2.1.0
+# pyyaml>=5.4.0
+
 
 # Foundation Image Model Access
 timm>=0.5.4
@@ -15,6 +20,7 @@ pandas>=1.3.0
 pillow>=8.2.0
 matplotlib>=3.4.0
 scipy>=1.7.0
+# seaborn>=0.11.0
 
 # Experiment Tracking
 wandb>=0.12.0
@@ -23,8 +29,8 @@ tqdm>=4.61.0
 # Utilities
 jsonschema>=3.2.0
 requests>=2.25.0
-typing-extensions>=3.10.0
-setuptools >= 75.9.1
+# typing-extensions>=3.10.0
+# setuptools >= 75.9.1
 
 # Jupyter Notebook Support
 ipykernel>=6.0.0  # IPython kernel for Jupyter
@@ -34,7 +40,6 @@ jupyter-core>=4.9.0    # Core functionality of Jupyter
 matplotlib-inline>=0.1.3  # Matplotlib inline plotting support
 jupyter>=1.0.0
 ipywidgets>=7.6.0
-seaborn>=0.11.0
 
 # For loading environment variables from .env file
 python-dotenv==1.0.0
