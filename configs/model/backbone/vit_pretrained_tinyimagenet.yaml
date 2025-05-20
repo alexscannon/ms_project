@@ -1,0 +1,16 @@
+name: vit_small_patch16_224
+model_name: vit_pretrained_tinyimagenet
+pretrained: true
+feature_dim: 384
+freeze_backbone: true
+type: vision_transformer_classification
+location: /content/drive/MyDrive/vit_pretrain_04_output/
+model_filename: vit_small_patch16_224_tinyimagenet_pretrained.pth
+num_classes: 160 # This ViT is trained on a reduced class count for OOD purposes.
+
+# vit_small_patch16_224
+checkpoint_keys:
+  class_info: class_info
+  pretrain_classes: pretrain_classes
+  pretrain_examples: pretrain_examples
+  model_state_dict: model_state_dict
