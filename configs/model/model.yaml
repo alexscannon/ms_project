@@ -1,5 +1,5 @@
 defaults:
-  - backbone: vit_pretrained_cifar100
+  - backbone: vit_pretrained_tinyimagenet
   - ood: energy
   - adapter: lora
 
