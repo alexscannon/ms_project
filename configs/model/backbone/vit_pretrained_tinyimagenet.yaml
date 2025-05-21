@@ -4,7 +4,7 @@ pretrained: true
 feature_dim: 384
 freeze_backbone: true
 type: vision_transformer_classification
-location: /content/drive/MyDrive/vit_pretrain_04_output/
+location: /content/drive/MyDrive/MS_Project/Notebooks/models/vit_pretrained_tinyimagenet/
 model_filename: vit_small_patch16_224_tinyimagenet_pretrained.pth
 num_classes: 160 # This ViT is trained on a reduced class count for OOD purposes.
 

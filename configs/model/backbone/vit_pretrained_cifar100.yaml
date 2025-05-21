@@ -4,7 +4,7 @@ pretrained: true
 feature_dim: 384
 freeze_backbone: true
 type: vision_transformer_classification
-location: /content/drive/MyDrive/vit_pretraining/checkpoints
+location: /content/drive/MyDrive/MS_Project/Notebooks/models/vit_pretrained_cifar100/checkpoints
 model_filename: vit_final_checkpoint.pth
 num_classes: 80 # This ViT is trained on a reduced class count for OOD purposes.
 
