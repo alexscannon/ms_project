@@ -1,2 +1,25 @@
-location: /content/drive/MyDrive/data/tinyimagenet/
+name: tiny_imagenet
+location: /content/drive/MyDrive/data/tinyimagenet/ # Root directory for the Tiny ImageNet dataset
 
+# --- Dataset Characteristics ---
+num_classes: 200  # Tiny ImageNet has 200 classes
+image_size: 64    # Original image size (height and width) for Tiny ImageNet
+channels: 3       # Number of image channels (e.g., 3 for RGB)
+
+# --- Data Structure (paths relative to 'location') ---
+# These define where the train, validation, and (optionally) test sets are.
+# Adjust them if your Tiny ImageNet directory structure is different.
+train_folder: train                     # Subfolder for training images
+val_folder: val                         # Subfolder for validation images
+# Tiny ImageNet's validation set often requires an annotations file to map images to their correct class folders/labels.
+val_annotations_file: val/val_annotations.txt
+# test_folder: test                     # Subfolder for test images (often unlabeled, if present)
+
+# --- Data Preprocessing Parameters --- #
+mean: [0.485, 0.456, 0.406] # Example: ImageNet mean for normalization
+std: [0.229, 0.224, 0.225]  # Example: ImageNet std for normalization
+
+# --- Optional: Data Loader Parameters ---
+# These might also be part of a main training configuration.
+# batch_size: 64
+# num_workers: 4
