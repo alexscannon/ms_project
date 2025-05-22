@@ -25,8 +25,9 @@ class VisionTransformer(nn.Module):
         # --- Path Configuration --- #
         # Only CIFAR-100 has a separate checkpoint directory
         if self.dataset_name == 'cifar100':
-            checkpoint_dir = os.path.join(self.config.model.backbone.location, self.dataset_name)
-        checkpoint_path = os.path.join(checkpoint_dir, self.config.model.backbone.model_filename)
+            checkpoint_path = os.path.join(self.config.model.backbone.location, self.dataset_name, self.config.model.backbone.model_filename)
+        else:
+            checkpoint_path = os.path.join(self.config.model.backbone.location, self.config.model.backbone.model_filename)
 
         if not os.path.exists(checkpoint_path):
             logging.error(f"Checkpoint file not found at {checkpoint_path}")
