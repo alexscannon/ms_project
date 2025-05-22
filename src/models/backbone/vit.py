@@ -23,7 +23,9 @@ class VisionTransformer(nn.Module):
         Load a pretrained ViT model from the location specified in the config.
         """
         # --- Path Configuration --- #
-        checkpoint_dir = os.path.join(self.config.model.backbone.location, self.dataset_name)
+        # Only CIFAR-100 has a separate checkpoint directory
+        if self.dataset_name == 'cifar100':
+            checkpoint_dir = os.path.join(self.config.model.backbone.location, self.dataset_name)
         checkpoint_path = os.path.join(checkpoint_dir, self.config.model.backbone.model_filename)
 
         if not os.path.exists(checkpoint_path):
