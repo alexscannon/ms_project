@@ -1,3 +1,6 @@
+# Core Libraries
+python>=3.10
+
 # Core ML Libraries
 torch>=1.9.0
 torchvision>=0.10.0

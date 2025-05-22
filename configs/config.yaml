@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - model: model
-  - data: tiny_imagenet # options: cifar100, tiny_imagenet
+  - data: cifar100 # options: cifar100, tiny_imagenet
 
 # General
 seed: 42 # random seed for reproducability

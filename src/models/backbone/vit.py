@@ -4,7 +4,7 @@ import torch.nn as nn
 from omegaconf import DictConfig
 from timm import create_model
 import logging # Import logging
-
+from src.utils import get_checkpoint_dict
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,35 +22,12 @@ class VisionTransformer(nn.Module):
         """
         Load a pretrained ViT model from the location specified in the config.
         """
-        # --- Path Configuration --- #
-        # Only CIFAR-100 has a separate checkpoint directory
-        if self.dataset_name == 'cifar100':
-            checkpoint_path = os.path.join(self.config.model.backbone.location, self.dataset_name, self.config.model.backbone.model_filename)
-        else:
-            checkpoint_path = os.path.join(self.config.model.backbone.location, self.config.model.backbone.model_filename)
-
-        if not os.path.exists(checkpoint_path):
-            logging.error(f"Checkpoint file not found at {checkpoint_path}")
-            raise FileNotFoundError(f"Checkpoint file not found at {checkpoint_path}")
-
-        # --- Load Checkpoint ---
-        try:
-            checkpoint_data = torch.load(checkpoint_path, map_location=self.device) # Load directly to target device if possible
-            logging.info(f"Successfully loaded checkpoint from {checkpoint_path}")
-        except Exception as e:
-            logging.error(f"Failed to load checkpoint from {checkpoint_path}: {e}")
-
-        # --- Checkpoint Structure ---
-        # TODO: Logic is specific to how this ViT was pretrained (see pretrain directory)
-        # Consider making these keys configurable via self.config.model.checkpoint_keys
+        # Load the checkpoint data
+        checkpoint_data = get_checkpoint_dict(self.dataset_name, self.config, self.device)
         model_state_dict_key = self.config.model.backbone.checkpoint_keys.get('model_state_dict', 'model_state_dict')
 
-        try:
-            state_dict = checkpoint_data[model_state_dict_key]
-        except KeyError as e:
-            logging.error(f"Missing expected key in checkpoint {checkpoint_path}: {e}")
-            raise KeyError(f"Missing expected key in checkpoint {checkpoint_path}: {e}")
-
+        # Load the model state dictionary
+        state_dict = checkpoint_data[model_state_dict_key]
 
         # --- Model Creation & Loading ---
         try:
@@ -61,7 +38,7 @@ class VisionTransformer(nn.Module):
             model.load_state_dict(state_dict) # load the pre-trained ViT parameters
             model.to(self.device) # Ensure model is on the correct device
 
-            logging.info(f"Loaded {self.dataset_name} ViT model with {self.config.model.backbone.num_classes} classes from {checkpoint_path}")
+            logging.info(f"Loaded {self.dataset_name} ViT model with {self.config.model.backbone.num_classes} number of classes ...")
             return model # Return the loaded model
         except RuntimeError as e:
             logging.error(f"Failed to load state dict into model: {e}")
