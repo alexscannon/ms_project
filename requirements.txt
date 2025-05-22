@@ -1,5 +1,5 @@
 # Core Libraries
-python>=3.10
+python>=3.9
 
 # Core ML Libraries
 torch>=1.9.0
