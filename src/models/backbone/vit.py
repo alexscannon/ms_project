@@ -1,4 +1,5 @@
 import os
+from typing import Dict
 import torch
 import torch.nn as nn
 from omegaconf import DictConfig
@@ -10,24 +11,25 @@ from src.utils import get_checkpoint_dict
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class VisionTransformer(nn.Module):
-    def __init__(self, config: DictConfig):
+    def __init__(self, config: DictConfig, checkpoint_data: Dict):
         super().__init__()
 
         self.config = config
         self.dataset_name = config.data.name
         self.device = config.device
         self.model = self.load_pretrained_model() # Renamed 'location' to 'checkpoint_type' for clarity if it means 'best', 'last' etc.
+        self.model_name = self.config.model.backbone.get('name', 'vit_small_patch16_224')
+        self.checkpoint_data = checkpoint_data
 
     def load_pretrained_model(self) -> nn.Module:
         """
         Load a pretrained ViT model from the location specified in the config.
         """
         # Load the checkpoint data
-        checkpoint_data = get_checkpoint_dict(self.dataset_name, self.config, self.device)
         model_state_dict_key = self.config.model.backbone.checkpoint_keys.get('model_state_dict', 'model_state_dict')
 
         # Load the model state dictionary
-        state_dict = checkpoint_data[model_state_dict_key]
+        state_dict = self.checkpoint_data[model_state_dict_key]
 
         # --- Model Creation & Loading ---
         try:
@@ -47,10 +49,14 @@ class VisionTransformer(nn.Module):
 
     def create_raw_vit(self, num_classes: int) -> nn.Module:
         # If num_classes=0, this removes classification head, allowing model to be used as a feature extractor
-        model_name = self.config.model.backbone.get('name', 'vit_small_patch16_224')
-        model = create_model(model_name, pretrained=False, num_classes=num_classes)
-
-        logging.info(f"Created raw ViT model '{model_name}' with {num_classes} output classes.")
+        model = create_model(
+            model_name=self.model_name,
+            pretrained=False,
+            num_classes=num_classes,
+            patch_size=self.config.model.backbone.patch_size,
+            drop_path_rate=self.config.model.backbone.dropout_rate,
+        )
+        logging.info(f"Created raw ViT model '{self.model_name}' with {num_classes} output classes.")
         return model
 
 

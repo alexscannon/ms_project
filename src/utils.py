@@ -5,6 +5,7 @@ import logging
 
 def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: str) -> dict:
     # Only CIFAR-100 has a separate checkpoint directory
+    logging.info(f"Loading checkpoint for {dataset_name} from {config.model.backbone.location}")
     if dataset_name == 'cifar100':
         checkpoint_path = os.path.join(config.model.backbone.location, dataset_name, config.model.backbone.model_filename)
     else:

@@ -1,5 +1,12 @@
+from typing import Dict, Tuple
+from omegaconf import DictConfig
+import torch
 from torchvision import datasets, transforms
 import os
+import logging
+from torch.utils.data import Subset
+
+from src.data.cifar100_dataset import CIFAR100Dataset
 
 DATASET_REGISTRY = {
     'cifar100': datasets.CIFAR100,
@@ -13,16 +20,17 @@ def create_transform(config):
     # Add resize if image_size is specified
     if hasattr(config.dataset, 'image_size'):
         transform_list.append(
-            transforms.Resize((config.dataset.image_size, config.dataset.image_size))
+            transforms.Resize(config.dataset.image_size)
         )
+
+    # Convert to tensor
+    transform_list.append(transforms.ToTensor())
+
     # Add normalization if mean and std are specified
     if hasattr(config.dataset, 'mean') and hasattr(config.dataset, 'std'):
         transform_list.append(
             transforms.Normalize(mean=config.dataset.mean, std=config.dataset.std)
         )
-
-    # Convert to tensor
-    transform_list.append(transforms.ToTensor())
 
     return transforms.Compose(transform_list)
 
@@ -96,3 +104,37 @@ def load_dataset(config):
     )
 
     return continual_dataset
+
+def create_ood_detection_datasets(config: DictConfig, checkpoint_data: Dict) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+    """
+    Create ID and OOD datasets based on class_info from the checkpoint object.
+
+    Args:
+        config: Configuration
+        checkpoint_data: Class information from the checkpoint
+    Returns:
+        Tuple of (id_dataset, ood_dataset)
+    """
+    # TODO: Change property names to match the ones in the notebook if another run is made (#3 -> #4)
+    class_info = checkpoint_data['class_info']
+
+    if config.data.name == 'cifar100':
+        dataset = CIFAR100Dataset(config)
+    elif config.data.name == 'tiny_imagenet':
+        raise NotImplementedError("Tiny ImageNet is not supported yet.")
+    else:
+        raise ValueError(f"Dataset {config.data.name} not supported.")
+
+    # Create ID dataset (samples from pretrain classes)
+    left_out_ind_indices = class_info['left_out_indices']
+    left_out_ind_dataset = Subset(dataset.train, left_out_ind_indices)
+
+    # Create OOD dataset (samples from continual/OOD classes)
+    left_out_classes = dict(class_info['continual_classes'])
+    ood_indices = [i for i, (_, label) in enumerate(dataset.train) if label in left_out_classes]
+    ood_dataset = Subset(dataset.train, ood_indices)
+
+    print(f"Created ID dataset with {len(left_out_ind_dataset)} samples from {len(left_out_ind_indices)} classes")
+    print(f"Created OOD dataset with {len(ood_dataset)} samples from {len(class_info['continual_classes'])} classes")
+
+    return left_out_ind_dataset, ood_dataset
