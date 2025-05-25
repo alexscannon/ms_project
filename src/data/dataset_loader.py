@@ -134,7 +134,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: Dict) -> 
     ood_indices = [i for i, (_, label) in enumerate(dataset.train) if label in left_out_classes]
     ood_dataset = Subset(dataset.train, ood_indices)
 
-    print(f"Created ID dataset with {len(left_out_ind_dataset)} samples from {len(left_out_ind_indices)} classes")
-    print(f"Created OOD dataset with {len(ood_dataset)} samples from {len(class_info['continual_classes'])} classes")
+    logging.info(f"Created ID dataset with {len(left_out_ind_dataset)} samples from {len(left_out_ind_indices)} classes")
+    logging.info(f"Created OOD dataset with {len(ood_dataset)} samples from {len(class_info['continual_classes'])} classes")
 
     return left_out_ind_dataset, ood_dataset

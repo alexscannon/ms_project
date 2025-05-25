@@ -29,9 +29,11 @@ def main(config: DictConfig):
 
     # ============== OOD detection ============== #
     # Load remaining ID and OOD datasets
+    logging.info("Loading remaining ID and the OOD datasets...")
     left_out_ind_dataset, ood_dataset = create_ood_detection_datasets(config, checkpoint_data)
 
     # Create OOD detector
+    logging.info("Creating OOD detector...")
     ood_detector = OODDetector(config, model, device, left_out_ind_dataset, ood_dataset)
 
 if __name__ == "__main__":
