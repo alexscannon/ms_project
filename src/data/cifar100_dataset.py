@@ -10,14 +10,14 @@ class CIFAR100Dataset():
             root='./data/cifar100',
             train=True,
             download=True,
-            transform=self.transform
+            transform=self.transform()
         )
 
         self.test = datasets.CIFAR100(
             root='./data/cifar100',
             train=False,
             download=True,
-            transform=self.transform
+            transform=self.transform()
         )
 
         self.all_data = np.concatenate((self.train, self.test))
