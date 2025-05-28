@@ -66,6 +66,7 @@ class OODDetector:
         aurocs: dict = self.calculate_all_aurocs(scores)
         return aurocs
 
+
     def get_mahalanobis_distance(self, input: torch.Tensor) -> torch.Tensor:
         """Mahalanobis distance method"""
         pass
@@ -152,7 +153,7 @@ class OODDetector:
         }
 
 
-    def _ensure_batch_format(self, input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _ensure_batch_format(self, input: torch.utils.data.Subset) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Ensure inputs have batch dimension.
 
@@ -164,8 +165,7 @@ class OODDetector:
             y (torch.Tensor): Shape [B] or None
         """
         # Add batch dimension if needed
-        logging.info(f"Input shape: {input.shape}")
-        x, y = input
+        x, y = input.dataset.tensors
         if x.ndim == 3:
             x = x.unsqueeze(0)
 
