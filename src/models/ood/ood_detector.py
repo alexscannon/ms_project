@@ -86,6 +86,7 @@ class OODDetector:
         """
         auroc_msp = self.evaluate_with_auroc(scores["msp"]["scores_ind"], scores["msp"]["scores_ood"])
         auroc_odin = self.evaluate_with_auroc(scores["odin"]["scores_ind"], scores["odin"]["scores_ood"])
+
         return {
             "msp": auroc_msp,
             "odin": auroc_odin
