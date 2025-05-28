@@ -1,3 +1,4 @@
+import logging
 from typing import Tuple
 import torch
 from omegaconf import DictConfig
@@ -151,7 +152,6 @@ class OODDetector:
         }
 
 
-
     def _ensure_batch_format(self, input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Ensure inputs have batch dimension.
@@ -164,6 +164,7 @@ class OODDetector:
             y (torch.Tensor): Shape [B] or None
         """
         # Add batch dimension if needed
+        logging.info(f"Input shape: {input.shape}")
         x, y = input
         if x.ndim == 3:
             x = x.unsqueeze(0)
@@ -176,5 +177,6 @@ class OODDetector:
                 y = y.unsqueeze(0)
 
         return x, y # Return tuple of (x, y)
+
 
 
