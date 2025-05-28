@@ -34,7 +34,7 @@ def main(config: DictConfig):
 
     # Create OOD detector
     logging.info("Creating OOD detector...")
-    ood_detector = OODDetector(config, model, device, left_out_ind_dataset, ood_dataset)
+    ood_detector = OODDetector(config, model, device)
 
     # Run OOD detection
     logging.info("Running OOD detection...")

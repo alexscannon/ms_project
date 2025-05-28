@@ -15,8 +15,8 @@ class OODDetector:
             self,
             config: DictConfig,
             model: torch.nn.Module,
-            temperature: float = 1.0,
             device: str = 'cuda',
+            temperature: float = 1.0,
         ):
         self.config = config
         self.model = model
