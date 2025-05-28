@@ -53,7 +53,7 @@ class OODDetector:
         return features, logits
 
 
-    def run_ood_detection(self, left_out_ind_dataset: torch.utils.data.Dataset, ood_dataset: torch.utils.data.Dataset) -> dict:
+    def run_ood_detection(self, left_out_ind_dataset: torch.utils.data.Subset, ood_dataset: torch.utils.data.Subset) -> dict:
         """
         Run OOD detection on the input tensor.
         Args:
@@ -111,7 +111,7 @@ class OODDetector:
         auroc = roc_auc_score(all_labels, -all_scores)  # Negative because lower scores = OOD
         return auroc
 
-    def get_ood_scores(self, left_out_ind_dataset: torch.utils.data.Dataset, ood_dataset: torch.utils.data.Dataset) -> dict:
+    def get_ood_scores(self, left_out_ind_dataset: torch.utils.data.Subset, ood_dataset: torch.utils.data.Subset) -> dict:
         """
         Get OOD scores from the input tensor.
         Args:
@@ -165,7 +165,7 @@ class OODDetector:
             y (torch.Tensor): Shape [B] or None
         """
         # Add batch dimension if needed
-        x, y = input.dataset.tensors
+        x, y = input.dataset
         if x.ndim == 3:
             x = x.unsqueeze(0)
 

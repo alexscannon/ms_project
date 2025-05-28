@@ -105,7 +105,7 @@ def load_dataset(config):
 
     return continual_dataset
 
-def create_ood_detection_datasets(config: DictConfig, checkpoint_data: Dict) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+def create_ood_detection_datasets(config: DictConfig, checkpoint_data: Dict) -> Tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
     """
     Create ID and OOD datasets based on class_info from the checkpoint object.
 
