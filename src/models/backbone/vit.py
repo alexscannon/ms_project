@@ -43,6 +43,7 @@ class VisionTransformer(nn.Module):
 
             logging.info(f"Loaded {self.dataset_name} ViT model with {self.config.model.backbone.num_classes} number of classes ...")
             return model # Return the loaded model
+
         except RuntimeError as e:
             logging.error(f"Failed to load state dict into model: {e}")
             raise RuntimeError(f"Failed to load state dict into model: {e}")
@@ -50,15 +51,19 @@ class VisionTransformer(nn.Module):
 
     def create_raw_vit(self, num_classes: int) -> nn.Module:
         # If num_classes=0, this removes classification head, allowing model to be used as a feature extractor
-        model = create_model(
-            model_name=self.model_name,
-            pretrained=False,
-            num_classes=num_classes,
-            patch_size=self.config.model.backbone.patch_size,
-            drop_path_rate=self.config.model.backbone.dropout_rate,
-        )
-        logging.info(f"Created raw ViT model '{self.model_name}' with {num_classes} output classes.")
-        return model
+        try:
+            model = create_model(
+                model_name=self.model_name,
+                pretrained=False,
+                num_classes=num_classes,
+                patch_size=self.config.model.backbone.patch_size,
+                drop_path_rate=self.config.model.backbone.dropout_rate,
+            )
+            logging.info(f"Created raw ViT model '{self.model_name}' with {num_classes} output classes.")
+            return model
+        except Exception as e:
+            logging.error(f"Failed to create raw ViT model: {e}")
+            raise RuntimeError(f"Failed to create raw ViT model: {e}")
 
 
 
