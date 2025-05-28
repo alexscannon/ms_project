@@ -17,9 +17,10 @@ class VisionTransformer(nn.Module):
         self.config = config
         self.dataset_name = config.data.name
         self.device = config.device
-        self.model = self.load_pretrained_model() # Renamed 'location' to 'checkpoint_type' for clarity if it means 'best', 'last' etc.
         self.model_name = self.config.model.backbone.get('name', 'vit_small_patch16_224')
         self.checkpoint_data = checkpoint_data
+
+        self.model = self.load_pretrained_model() # Renamed 'location' to 'checkpoint_type' for clarity if it means 'best', 'last' etc.
 
     def load_pretrained_model(self) -> nn.Module:
         """
