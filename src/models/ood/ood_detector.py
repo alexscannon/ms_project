@@ -158,13 +158,15 @@ class OODDetector:
         Ensure inputs have batch dimension.
 
         Args:
-            input (torch.Tensor): Input tensor, shape [C, H, W] or [B, C, H, W]
+            input (torch.utils.data.Subset): Input subset
 
         Returns:
             x (torch.Tensor): Shape [B, C, H, W]
             y (torch.Tensor): Shape [B] or None
         """
         # Add batch dimension if needed
+        logging.info(f"Input type: {type(input)}")
+        logging.info(f"Input dataset: {input.dataset}")
         x, y = input.dataset
         if x.ndim == 3:
             x = x.unsqueeze(0)
