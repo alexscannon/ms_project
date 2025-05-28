@@ -115,7 +115,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: Dict) -> 
     Returns:
         Tuple of (id_dataset, ood_dataset)
     """
-    # TODO: Change property names to match the ones in the notebook if another run is made (#3 -> #4)
+    # TODO: Change property names to match the ones in the notebook if another training run is conducted (#3 -> #4)
     class_info = checkpoint_data['class_info']
 
     if config.data.name == 'cifar100':

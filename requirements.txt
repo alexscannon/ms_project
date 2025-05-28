@@ -4,6 +4,7 @@ torchvision>=0.10.0
 numpy>=2.0.0,<3.0.0
 scikit-learn>=0.24.0
 torchmetrics>=0.8.0  # PyTorch metrics collection for ML
+pytorch-ood >= 0.2.1 # OOD detection library
 
 
 # Configuration Management

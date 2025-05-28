@@ -1,0 +1,20 @@
+# OOD detection configuration
+threshold: 0.5 # Threshold for OOD detection
+
+energy:
+  temperature: 1000.0
+  epsilon: 0.0014
+msp:
+  temperature: 1.0
+  threshold: 0.5
+odin:
+  temperature: 1000.0 # Temperature scaling parameter
+  epsilon: 0.002 # Magnitude of input preprocessing (Value from paper for CIFAR-100)
+  criterion: "NLL" # Criterion for OOD detection
+  threshold: 0.5
+mahalanobis:
+  temperature: 1000.0 # Temperature scaling parameter
+  epsilon: 0.0014 # Magnitude of input preprocessing
+entropy:
+  temperature: 1000.0 # Temperature scaling parameter
+  epsilon: 0.0014 # Magnitude of input preprocessing

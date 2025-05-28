@@ -36,5 +36,10 @@ def main(config: DictConfig):
     logging.info("Creating OOD detector...")
     ood_detector = OODDetector(config, model, device, left_out_ind_dataset, ood_dataset)
 
+    # Run OOD detection
+    logging.info("Running OOD detection...")
+    aurocs = ood_detector.run_ood_detection(left_out_ind_dataset, ood_dataset)
+    logging.info(f"AUROCs: {aurocs}")
+
 if __name__ == "__main__":
     main()
