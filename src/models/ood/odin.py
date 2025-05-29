@@ -101,13 +101,6 @@ class ODINDetector:
             # Apply the perturbation (subtract to increase confidence)
             preprocessed_input = x - (self.epsilon * gradient_vector)
 
-            # Clean up to free memory
-            if hasattr(x, 'grad'):
-                    x.grad = None # Zero out gradients
-            del loss # Delete intermediate tensors
-            del gradient_vector # Delete intermediate tensors
-            del logits # Delete intermediate tensors
-
         return preprocessed_input.detach() # Return tensor with gradients
 
     def calibrate_odin(self) -> torch.Tensor:

@@ -4,7 +4,7 @@ image_size: 32
 num_classes: 100
 mean: [0.5071, 0.4867, 0.4408]
 std: [0.2675, 0.2565, 0.2761]
-batch_size: 64
+batch_size: 32
 num_workers: 4
 pin_memory: true
 
