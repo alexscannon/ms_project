@@ -21,5 +21,6 @@ std: [0.229, 0.224, 0.225]  # Example: ImageNet std for normalization
 
 # --- Optional: Data Loader Parameters ---
 # These might also be part of a main training configuration.
-# batch_size: 64
-# num_workers: 4
+batch_size: 128
+num_workers: 4
+pin_memory: true

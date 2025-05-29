@@ -8,7 +8,6 @@ defaults:
 
 # General
 seed: 42 # random seed for reproducability
-num_workers: 4 # number of workers for dataloader
 device: cpu # CHANGE TO GPU IF YOU HAVE ONE
 output_dir: /content/drive/MyDrive/ms_project/results/ # Change this to your own path
 # save_model: false # save the model after training

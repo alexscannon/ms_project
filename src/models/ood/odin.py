@@ -33,18 +33,17 @@ class ODINDetector:
 
         self.model.eval() # Set model to evaluation mode
 
-    def predict_ood_odin(self, x: torch.Tensor, y: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def predict_ood_odin(self, dataloader: torch.utils.data.DataLoader) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Computes the OODIN score for the input tensor and a boolean decision if the input is OOD or not.
 
         Args:
-            x (torch.Tensor): Input tensor
-            y (torch.Tensor | None): Ground truth labels
+            dataloader (torch.utils.data.DataLoader): Input dataloader
         Returns:
             score (torch.Tensor): OODIN score of shape (B,)
             is_ood (torch.Tensor): Boolean tensor of shape (B,)
         """
-        odin_score = self.get_odin_scores(x, y)
+        odin_score = self.get_odin_scores(dataloader)
         is_ood = odin_score < self.threshold
         return odin_score, is_ood
 
@@ -70,7 +69,8 @@ class ODINDetector:
         Apply adversarial perturbation to the input tensor.
 
         Args:
-            input (torch.Tensor): Input tensor
+            x (torch.Tensor): Input tensor
+            y (torch.Tensor | None): Ground truth labels
         Returns:
             preprocessed_input (torch.Tensor): Preprocessed input tensor
         """

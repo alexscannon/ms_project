@@ -1,10 +1,10 @@
-from typing import Dict, Tuple
+from typing import Tuple
 from omegaconf import DictConfig
 import torch
 from torchvision import datasets, transforms
 import os
 import logging
-from torch.utils.data import Subset
+from torch.utils.data import Subset, DataLoader
 
 from src.data.cifar100_dataset import CIFAR100Dataset
 
@@ -105,15 +105,16 @@ def load_dataset(config):
 
     return continual_dataset
 
-def create_ood_detection_datasets(config: DictConfig, checkpoint_data: Dict) -> Tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
+def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
     """
     Create ID and OOD datasets based on class_info from the checkpoint object.
 
     Args:
-        config: Configuration
-        checkpoint_data: Class information from the checkpoint
+        config (DictConfig): Configuration
+        checkpoint_data (dict): Class information from the checkpoint
     Returns:
-        Tuple of (id_dataset, ood_dataset)
+        left_out_ind_dataset (torch.utils.data.DataLoader): DataLoader of the ID dataset
+        ood_dataset (torch.utils.data.DataLoader): DataLoader of the OOD dataset
     """
     # TODO: Change property names to match the ones in the notebook if another training run is conducted (#3 -> #4)
     class_info = checkpoint_data['class_info']
@@ -127,14 +128,24 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: Dict) -> 
 
     # Create ID dataset (samples from pretrain classes)
     left_out_ind_indices = class_info['left_out_indices']
-    left_out_ind_dataset = Subset(dataset.train, left_out_ind_indices)
+    left_out_ind_dataloader = DataLoader(
+        Subset(dataset.train, left_out_ind_indices),
+        batch_size=config.data.batch_size,
+        num_workers=config.data.num_workers,
+        pin_memory=config.data.pin_memory
+    )
 
     # Create OOD dataset (samples from continual/OOD classes)
     left_out_classes = set(class_info['continual_classes'])
     ood_indices = [i for i, (_, label) in enumerate(dataset.train) if label in left_out_classes]
-    ood_dataset = Subset(dataset.train, ood_indices)
+    ood_dataloader = DataLoader(
+        Subset(dataset.train, ood_indices),
+        batch_size=config.data.batch_size,
+        num_workers=config.data.num_workers,
+        pin_memory=config.data.pin_memory
+    )
 
-    logging.info(f"Created ID dataset with {len(left_out_ind_dataset)} samples from {len(left_out_ind_indices)} classes")
-    logging.info(f"Created OOD dataset with {len(ood_dataset)} samples from {len(class_info['continual_classes'])} classes")
+    logging.info(f"Created ID dataset with {len(left_out_ind_dataloader)} samples from {len(left_out_ind_indices)} classes")
+    logging.info(f"Created OOD dataset with {len(ood_dataloader)} samples from {len(class_info['continual_classes'])} classes")
 
-    return left_out_ind_dataset, ood_dataset
+    return left_out_ind_dataloader, ood_dataloader
