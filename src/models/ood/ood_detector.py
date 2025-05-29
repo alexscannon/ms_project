@@ -101,30 +101,30 @@ class OODDetector:
             x = x.to(self.device)
             if y is not None:
                 y = y.to(self.device)
-                batch_cache["labels"].append(y)
+                batch_cache["batch_data_info"]["labels"].append(y)
 
             # Compute logits and features
             with torch.no_grad():
                 logits, features = self.extract_features_and_logits(x)
-                batch_cache["logits"].append(logits)
-                batch_cache["features"].append(features)
+                batch_cache["batch_data_info"]["logits"].append(logits)
+                batch_cache["batch_data_info"]["features"].append(features)
 
             # =========== Compute OOD scores =========== #
             # ODIN
             if "odin" in self.detectors:
                 odin_scores = self.detectors["odin"].get_odin_scores(x, y)
-                batch_cache["detector_scores"]["odin_scores"].append(odin_scores)
+                batch_cache["batch_data_info"]["odin_scores"].append(odin_scores)
 
             # MSP
             if "msp" in self.detectors:
                 msp_scores = self.detectors["msp"].get_msp_scores(logits)
-                batch_cache["detector_scores"]["msp_scores"].append(msp_scores)
+                batch_cache["batch_data_info"]["msp_scores"].append(msp_scores)
 
         all_logits = torch.cat(batch_cache["batch_data_info"]["logits"], dim=0)
         all_features = torch.cat(batch_cache["batch_data_info"]["features"], dim=0)
         all_labels = torch.cat(batch_cache["batch_data_info"]["labels"], dim=0)
-        all_odin_scores = torch.cat(batch_cache["detector_scores"]["odin_scores"], dim=0)
-        all_msp_scores = torch.cat(batch_cache["detector_scores"]["msp_scores"], dim=0)
+        all_odin_scores = torch.cat(batch_cache["batch_data_info"]["odin_scores"], dim=0)
+        all_msp_scores = torch.cat(batch_cache["batch_data_info"]["msp_scores"], dim=0)
 
         return {
             "all_logits": all_logits,
@@ -218,10 +218,6 @@ class OODDetector:
             }
         }
 
-
-    def get_mahalanobis_distance(self, input: torch.Tensor) -> torch.Tensor:
-        """Mahalanobis distance method"""
-        pass
 
     def get_energy_score(self, input: torch.Tensor) -> torch.Tensor:
         """Energy score method"""
