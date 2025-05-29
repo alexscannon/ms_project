@@ -81,22 +81,23 @@ class ODINDetector:
             # Forward pass
             logits = self.model(x) / self.temperature # Temperature scaling
 
-            # Get the predicted class if ground truth is not provided
-            if y is None:
-                y = torch.argmax(logits, dim=1)
+            # ODIN perturbs inputs to increase confidence in the predicted class.
+            # So, the loss for gradient calculation should be based on the predicted class.
+            predicted_labels = torch.argmax(logits, dim=1)
 
             # Compute the loss
             if self.criterion == "NLL":
-                loss = F.nll_loss(logits, y)
+                # loss = F.nll_loss(logits, y) TODO: Look into if this is correct
+                loss = F.nll_loss(F.log_softmax(logits, dim=1), predicted_labels)
             elif self.criterion == "CE":
-                loss = F.cross_entropy(logits, y)
+                loss = F.cross_entropy(logits, predicted_labels)
             else:
                 raise ValueError(f"Invalid criterion: {self.criterion}")
 
 
             # Backward pass to compute gradients
             loss.backward()
-            gradient_vector = x.grad.sign() # Sign of the gradient
+            gradient_vector = x.grad.sign() if x.grad is not None else torch.zeros_like(x) # Sign of the gradient
 
             # Apply the perturbation (subtract to increase confidence)
             preprocessed_input = x - (self.epsilon * gradient_vector)

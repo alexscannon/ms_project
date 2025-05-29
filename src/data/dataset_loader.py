@@ -48,7 +48,7 @@ def load_dataset(config):
     # Get dataset class
     dataset_class = DATASET_REGISTRY[dataset_name]
 
-    logger.info(f"Loading {dataset_name} dataset...")
+    logging.info(f"Loading {dataset_name} dataset...")
 
     if dataset_name == 'imagenet':
         # ImageNet requires separate train and val directories
@@ -79,7 +79,7 @@ def load_dataset(config):
             split='val',
             transform=transform
         )
-    else:
+    elif dataset_name == 'cifar100':
         # Load train and test datasets using the root path from config
         train_dataset = dataset_class(
             root=config.dataset.root,
@@ -94,6 +94,8 @@ def load_dataset(config):
             download=True,
             transform=transform
         )
+    else:
+        raise ValueError(f"Dataset {dataset_name} not supported.")
 
     # Wrap in ContinualDataset
     # Could move back to main.py if we want to separate the continual dataset wrapper from the dataset loading.
