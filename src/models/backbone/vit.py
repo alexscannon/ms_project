@@ -50,6 +50,13 @@ class VisionTransformer(nn.Module):
 
 
     def create_raw_vit(self, num_classes: int) -> nn.Module:
+        """
+        Create a raw ViT model.
+        Args:
+            num_classes (int): Number of output classes
+        Returns:
+            model (nn.Module): ViT model
+        """
         # If num_classes=0, this removes classification head, allowing model to be used as a feature extractor
         try:
             model = create_model(
@@ -67,5 +74,13 @@ class VisionTransformer(nn.Module):
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
+        """
+        Forward pass of the ViT model.
+        Args:
+            x (torch.Tensor): Input tensor
+        Returns:
+            logits (torch.Tensor): Logits from the model
+        """
+        logits = self.model(x)
+        return logits
 
