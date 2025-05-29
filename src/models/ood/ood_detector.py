@@ -4,6 +4,7 @@ import torch
 from omegaconf import DictConfig
 from src.models.ood.msp import MSP
 from src.models.ood.odin import ODINDetector
+from src.models.ood.mahalanobis import MahalanobisDetector
 from sklearn.metrics import roc_auc_score
 import numpy as np
 from tqdm import tqdm
@@ -26,7 +27,7 @@ class OODDetector:
         self.detectors = {
             "msp": MSP(self.model, self.config.ood),
             "odin": ODINDetector(self.model, self.config.ood),
-            # TODO: Add more detectors here as needed
+            # "mahalanobis": MahalanobisDetector(self.model, self.config.ood, device=self.device)
         }
 
 
@@ -57,15 +58,19 @@ class OODDetector:
         """
         auroc_msp = None
         auroc_odin = None
+        auroc_mahalanobis = None
 
         if "msp" in self.detectors:
             auroc_msp = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "msp")
         if "odin" in self.detectors:
             auroc_odin = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "odin")
+        if "mahalanobis" in self.detectors:
+            auroc_mahalanobis = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "mahalanobis")
 
         return {
             "msp": auroc_msp,
-            "odin": auroc_odin
+            "odin": auroc_odin,
+            "mahalanobis": auroc_mahalanobis
         }
 
 
@@ -87,6 +92,7 @@ class OODDetector:
             "detector_scores": {
                 "odin_scores": [],
                 "msp_scores": [],
+                "mahalanobis_scores": [],
             }
         }
 
@@ -113,27 +119,52 @@ class OODDetector:
             # ODIN
             if "odin" in self.detectors:
                 odin_scores = self.detectors["odin"].get_odin_scores(x, y)
-                batch_cache["batch_data_info"]["odin_scores"].append(odin_scores)
+                batch_cache["detector_scores"]["odin_scores"].append(odin_scores)
 
             # MSP
             if "msp" in self.detectors:
                 msp_scores = self.detectors["msp"].get_msp_scores(logits)
-                batch_cache["batch_data_info"]["msp_scores"].append(msp_scores)
+                batch_cache["detector_scores"]["msp_scores"].append(msp_scores)
 
-        all_logits = torch.cat(batch_cache["batch_data_info"]["logits"], dim=0)
-        all_features = torch.cat(batch_cache["batch_data_info"]["features"], dim=0)
-        all_labels = torch.cat(batch_cache["batch_data_info"]["labels"], dim=0)
-        all_odin_scores = torch.cat(batch_cache["batch_data_info"]["odin_scores"], dim=0)
-        all_msp_scores = torch.cat(batch_cache["batch_data_info"]["msp_scores"], dim=0)
+            # Mahalanobis
+            if "mahalanobis" in self.detectors:
+                mahalanobis_detector = self.detectors["mahalanobis"]
+                if mahalanobis_detector.is_fitted:
+                    mahalanobis_scores = mahalanobis_detector.get_mahalanobis_scores(features)
+                    batch_cache["detector_scores"]["mahalanobis_scores"].append(mahalanobis_scores)
+                elif not hasattr(mahalanobis_detector, "_warned_not_fitted"): # Log warning only once
+                    logging.warning("Mahalanobis detector is not fitted. Skipping Mahalanobis score computation for this dataloader.")
+                    mahalanobis_detector._warned_not_fitted = True # Prevent repeated warnings
 
-        return {
+        all_logits = torch.cat(batch_cache["batch_data_info"]["logits"], dim=0) if batch_cache["batch_data_info"]["logits"] else torch.empty(0)
+        all_features = torch.cat(batch_cache["batch_data_info"]["features"], dim=0) if batch_cache["batch_data_info"]["features"] else torch.empty(0)
+        all_labels = torch.cat(batch_cache["batch_data_info"]["labels"], dim=0) if batch_cache["batch_data_info"]["labels"] else torch.empty(0)
+
+        all_odin_scores = None
+        if batch_cache["detector_scores"]["odin_scores"]:
+            all_odin_scores = torch.cat(batch_cache["detector_scores"]["odin_scores"], dim=0)
+
+        all_msp_scores = None
+        if batch_cache["detector_scores"]["msp_scores"]:
+            all_msp_scores = torch.cat(batch_cache["detector_scores"]["msp_scores"], dim=0)
+
+        all_mahalanobis_scores = None
+        if batch_cache["detector_scores"]["mahalanobis_scores"]:
+            all_mahalanobis_scores = torch.cat(batch_cache["detector_scores"]["mahalanobis_scores"], dim=0)
+
+        results = {
             "all_logits": all_logits,
             "all_features": all_features,
             "all_labels": all_labels,
-            "all_odin_scores": all_odin_scores,
-            "all_msp_scores": all_msp_scores,
         }
+        if all_odin_scores is not None:
+            results["all_odin_scores"] = all_odin_scores
+        if all_msp_scores is not None:
+            results["all_msp_scores"] = all_msp_scores
+        if all_mahalanobis_scores is not None:
+            results["all_mahalanobis_scores"] = all_mahalanobis_scores
 
+        return results
 
 
     def extract_features_and_logits(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -169,12 +200,49 @@ class OODDetector:
         Returns:
             auroc (float): Area under the ROC curve
         """
+        key_name = f"all_{detector_name}_scores"
 
-        all_scores = np.concatenate([left_out_ind_stats[f"all_{detector_name}_scores"], ood_stats[f"all_{detector_name}_scores"]])
-        all_labels = np.concatenate([left_out_ind_stats["all_labels"], ood_stats["all_labels"]])
+        # Ensure scores are present and are tensors
+        ind_scores_tensor = left_out_ind_stats.get(key_name)
+        ood_scores_tensor = ood_stats.get(key_name)
 
-        # For AUROC calculation, we need to flip scores since lower = OOD
-        auroc = roc_auc_score(all_labels, -all_scores)  # Negative because lower scores = OOD
+        if ind_scores_tensor is None or ood_scores_tensor is None:
+            logging.warning(f"Scores for '{detector_name}' not found in one or both datasets for AUROC calculation. Skipping.")
+            return np.nan # Return NaN or handle appropriately
+
+        if not isinstance(ind_scores_tensor, torch.Tensor) or not isinstance(ood_scores_tensor, torch.Tensor):
+            logging.warning(f"Scores for '{detector_name}' are not tensors. Skipping AUROC calculation.")
+            return np.nan
+
+        # Convert to numpy for sklearn
+        ind_scores = ind_scores_tensor.cpu().numpy()
+        ood_scores = ood_scores_tensor.cpu().numpy()
+
+        all_scores = np.concatenate([ind_scores, ood_scores])
+
+        # Create labels: 0 for in-distribution, 1 for out-of-distribution
+        # Note: The original code used labels from the data, which might be class labels.
+        # For OOD AUROC, we need binary labels indicating ID vs OOD.
+        # Let's assume left_out_ind_stats are ID (label 0) and ood_stats are OOD (label 1).
+        labels_ind = np.zeros(len(ind_scores), dtype=int)
+        labels_ood = np.ones(len(ood_scores), dtype=int)
+        all_labels = np.concatenate([labels_ind, labels_ood])
+
+
+        # For AUROC calculation, roc_auc_score expects higher scores for the positive class (OOD).
+        # Our OOD scores are designed such that:
+        # - MSP: higher = ID
+        # - ODIN: higher = ID (max softmax probability after perturbation)
+        # - Mahalanobis: higher = ID (negative distance)
+        # So, for all these, lower scores indicate OOD.
+        # roc_auc_score(y_true, y_score) where y_score is confidence score for class 1 (OOD).
+        # If our scores are confidence for ID, then we use 1 - score or -score for OOD confidence.
+        # Using -all_scores effectively flips it so lower original scores (more OOD) become higher values.
+        try:
+            auroc = roc_auc_score(all_labels, -all_scores)
+        except ValueError as e:
+            logging.error(f"AUROC calculation failed for {detector_name}: {e}. Scores: {all_scores[:10]}, Labels: {all_labels[:10]}")
+            auroc = np.nan # Return NaN if calculation fails (e.g. only one class present in y_true)
         return auroc
 
     def get_ood_scores(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
@@ -217,6 +285,36 @@ class OODDetector:
                 "is_ood_ood": is_ood_odin_ood
             }
         }
+
+    def fit_detector(self, detector_name: str, train_dataloader: torch.utils.data.DataLoader, num_classes: int):
+        """
+        Fit a specific OOD detector that requires a fitting process.
+
+        Args:
+            detector_name (str): Name of the detector to fit (e.g., "mahalanobis").
+            train_dataloader (torch.utils.data.DataLoader): Dataloader for in-distribution training data.
+            num_classes (int): The total number of expected classes.
+        """
+        if detector_name not in self.detectors:
+            logging.warning(f"Detector '{detector_name}' not found or not initialized. Skipping fit.")
+            return
+
+        detector_instance = self.detectors[detector_name]
+
+        if detector_name == "mahalanobis":
+            if hasattr(detector_instance, "fit"):
+                logging.info(f"Fitting {detector_name} detector...")
+                # Pass the OODDetector's own feature extractor
+                detector_instance.fit(train_dataloader, self.extract_features_and_logits, num_classes)
+                logging.info(f"{detector_name} detector fitting complete.")
+            else:
+                logging.warning(f"Detector '{detector_name}' does not have a 'fit' method.")
+        # Add other fit-able detectors here if needed
+        # elif detector_name == "other_fittable_detector":
+        #     detector_instance.fit(...)
+        else:
+            logging.info(f"Detector '{detector_name}' does not require an explicit fitting step via this method.")
+
 
 
     def get_energy_score(self, input: torch.Tensor) -> torch.Tensor:
