@@ -66,5 +66,6 @@ class VisionTransformer(nn.Module):
             raise RuntimeError(f"Failed to create raw ViT model: {e}")
 
 
-
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x)
 
