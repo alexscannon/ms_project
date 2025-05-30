@@ -30,7 +30,7 @@ def main(config: DictConfig):
     # ============== OOD detection ============== #
     # Load remaining ID and OOD datasets
     logging.info("Loading remaining ID and the OOD datasets...")
-    left_out_ind_dataloader, ood_dataloader = create_ood_detection_datasets(config, checkpoint_data)
+    left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader = create_ood_detection_datasets(config, checkpoint_data)
 
     # Create OOD detector
     logging.info("Creating OOD detector...")
@@ -38,7 +38,7 @@ def main(config: DictConfig):
 
     # Run OOD detection
     logging.info("Running OOD detection...")
-    aurocs = ood_detector.run_ood_detection(left_out_ind_dataloader, ood_dataloader)
+    aurocs = ood_detector.run_ood_detection(left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader)
     logging.info(f"AUROCs: {aurocs}")
 
 if __name__ == "__main__":

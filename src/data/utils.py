@@ -1,0 +1,31 @@
+import torch
+
+class ClassRemappingDataset(torch.utils.data.Dataset):
+    """
+    A dataset wrapper that remaps class labels.
+    """
+    def __init__(self, dataset: torch.utils.data.Dataset, class_mapping: dict):
+        """
+        Args:
+            dataset (torch.utils.data.Dataset): The original dataset (e.g., a Subset).
+            class_mapping (dict): A dictionary mapping original class labels
+                                  to new, consecutive class labels (e.g., {orig_label: new_label}).
+        """
+        self.dataset = dataset
+        self.class_mapping = class_mapping
+
+    def __getitem__(self, index: int) -> tuple:
+        img, original_target = self.dataset[index]
+        if original_target not in self.class_mapping:
+            # This error indicates a mismatch between the data subset and the provided mapping.
+            # The subset should only contain samples whose original labels are keys in class_mapping.
+            raise ValueError(
+                f"Original target {original_target} not found in class_mapping. "
+                f"Ensure the input dataset to ClassRemappingDataset only contains samples "
+                f"from the classes defined in the class_mapping."
+            )
+        new_target = self.class_mapping[original_target]
+        return img, new_target
+
+    def __len__(self) -> int:
+        return len(self.dataset)

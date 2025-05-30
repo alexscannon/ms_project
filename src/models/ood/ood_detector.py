@@ -31,16 +31,23 @@ class OODDetector:
         }
 
 
-    def run_ood_detection(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
+    def run_ood_detection(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader, pretrained_ind_dataloader: torch.utils.data.DataLoader) -> dict:
         """
         Run OOD detection on the remaining in-distribution and out-of-distribution dataloaders.
         Args:
             left_out_ind_dataset (torch.utils.data.Dataset): In-distribution dataset
             ood_dataset (torch.utils.data.Dataset): Out-of-distribution dataset
+            pretrained_ind_dataset (torch.utils.data.Dataset): Pretrained in-distribution dataset
         Returns:
             dict: Dictionary containing the OOD detection scores and labels
         """
+        # Fit the Mahalanobis detector
+        # self.detectors["mahalanobis"].fit(pretrained_ind_dataloader, self.extract_features_and_logits, self.config.data.num_ind_classes)
+
+        logging.info("Computing OOD detection scores for left-out in-distribution dataset...")
         left_out_ind_stats: dict = self.compute_data_ood_stats(left_out_ind_dataloader)
+
+        logging.info("Computing OOD detection scores for out-of-distribution dataset...")
         ood_stats: dict = self.compute_data_ood_stats(ood_dataloader)
 
         aurocs: dict = self.calculate_all_aurocs(left_out_ind_stats, ood_stats)
@@ -96,9 +103,9 @@ class OODDetector:
             }
         }
 
-        pbar = tqdm(dataloader, desc=f"Computing OOD detection scores")
+        pbar = tqdm(dataloader, desc=f"Computing OOD detection scores ...")
         for batch_idx, batch in enumerate(pbar): # Iterate over the dataloader
-            if isinstance(batch, (list, tuple)): # Batch has two elements: x and y
+            if isinstance(batch, (list, tuple)): # Batch has two elements: x (input) and y (labels)
                 x, y = batch[0], batch[1] if len(batch) > 1 else None
             else:
                 x, y = batch, None # If no labels are provided, set y to None
@@ -177,6 +184,7 @@ class OODDetector:
             features (torch.Tensor): Features from the model
             logits (torch.Tensor): Logits from the model
         """
+        self.model.eval() # Set model to evaluation mode
         logits = self.model(x)
         # For ViT, we can extract features from the last layer before classification
         # This assumes the model has a 'head' attribute for the classification layer
@@ -200,6 +208,7 @@ class OODDetector:
         Returns:
             auroc (float): Area under the ROC curve
         """
+        logging.info(f"Calculating AUROCs for the {detector_name} detector...")
         key_name = f"all_{detector_name}_scores"
 
         # Ensure scores are present and are tensors
@@ -219,6 +228,7 @@ class OODDetector:
         ood_scores = ood_scores_tensor.cpu().numpy()
 
         all_scores = np.concatenate([ind_scores, ood_scores])
+        logging.info(f"Shape of all scores: {all_scores.shape}")
 
         # Create labels: 0 for in-distribution, 1 for out-of-distribution
         # Note: The original code used labels from the data, which might be class labels.
@@ -227,7 +237,7 @@ class OODDetector:
         labels_ind = np.zeros(len(ind_scores), dtype=int)
         labels_ood = np.ones(len(ood_scores), dtype=int)
         all_labels = np.concatenate([labels_ind, labels_ood])
-
+        logging.info(f"Shape of all labels: {all_labels.shape}")
 
         # For AUROC calculation, roc_auc_score expects higher scores for the positive class (OOD).
         # Our OOD scores are designed such that:
@@ -245,76 +255,6 @@ class OODDetector:
             auroc = np.nan # Return NaN if calculation fails (e.g. only one class present in y_true)
         return auroc
 
-    def get_ood_scores(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
-        """
-        Get OOD scores from the input tensor.
-        Args:
-            left_out_ind_dataloader (torch.utils.data.DataLoader): In-distribution dataset
-            ood_dataloader (torch.utils.data.DataLoader): Out-of-distribution dataset
-        Returns:
-            dict: Dictionary containing the OOD detection scores and labels
-        """
-        # x_ind, y_ind = self._ensure_batch_format(left_out_ind_dataloader)
-        # x_ood, y_ood = self._ensure_batch_format(ood_dataloader)
-
-        # Extract features and logits
-        features_ind, logits_ind = self.extract_features_and_logits(left_out_ind_dataloader)
-        features_ood, logits_ood = self.extract_features_and_logits(ood_dataloader)
-
-        # ================ MSP ================ #
-        msp = MSP(self.model, self.config.ood)
-        msp_scores_ind, is_ood_msp_ind = msp.predict_ood_msp(logits_ind)
-        msp_scores_ood, is_ood_msp_ood = msp.predict_ood_msp(logits_ood)
-
-        # ================ ODIN ================ #
-        odin = ODINDetector(self.model, self.config.ood)
-        odin_scores_ind, is_ood_odin_ind = odin.predict_ood_odin(left_out_ind_dataloader)
-        odin_scores_ood, is_ood_odin_ood = odin.predict_ood_odin(ood_dataloader)
-
-        return {
-            "msp": {
-                "scores_ind": msp_scores_ind,
-                "is_ood_ind": is_ood_msp_ind,
-                "scores_ood": msp_scores_ood,
-                "is_ood_ood": is_ood_msp_ood
-            },
-            "odin": {
-                "scores_ind": odin_scores_ind,
-                "is_ood_ind": is_ood_odin_ind,
-                "scores_ood": odin_scores_ood,
-                "is_ood_ood": is_ood_odin_ood
-            }
-        }
-
-    def fit_detector(self, detector_name: str, train_dataloader: torch.utils.data.DataLoader, num_classes: int):
-        """
-        Fit a specific OOD detector that requires a fitting process.
-
-        Args:
-            detector_name (str): Name of the detector to fit (e.g., "mahalanobis").
-            train_dataloader (torch.utils.data.DataLoader): Dataloader for in-distribution training data.
-            num_classes (int): The total number of expected classes.
-        """
-        if detector_name not in self.detectors:
-            logging.warning(f"Detector '{detector_name}' not found or not initialized. Skipping fit.")
-            return
-
-        detector_instance = self.detectors[detector_name]
-
-        if detector_name == "mahalanobis":
-            if hasattr(detector_instance, "fit"):
-                logging.info(f"Fitting {detector_name} detector...")
-                # Pass the OODDetector's own feature extractor
-                detector_instance.fit(train_dataloader, self.extract_features_and_logits, num_classes)
-                logging.info(f"{detector_name} detector fitting complete.")
-            else:
-                logging.warning(f"Detector '{detector_name}' does not have a 'fit' method.")
-        # Add other fit-able detectors here if needed
-        # elif detector_name == "other_fittable_detector":
-        #     detector_instance.fit(...)
-        else:
-            logging.info(f"Detector '{detector_name}' does not require an explicit fitting step via this method.")
-
 
 
     def get_energy_score(self, input: torch.Tensor) -> torch.Tensor:
@@ -324,6 +264,46 @@ class OODDetector:
     def get_entropy_score(self, input: torch.Tensor) -> torch.Tensor:
         pass
 
+    # def get_ood_scores(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
+    #     """
+    #     Get OOD scores from the input tensor.
+    #     Args:
+    #         left_out_ind_dataloader (torch.utils.data.DataLoader): In-distribution dataset
+    #         ood_dataloader (torch.utils.data.DataLoader): Out-of-distribution dataset
+    #     Returns:
+    #         dict: Dictionary containing the OOD detection scores and labels
+    #     """
+    #     # x_ind, y_ind = self._ensure_batch_format(left_out_ind_dataloader)
+    #     # x_ood, y_ood = self._ensure_batch_format(ood_dataloader)
+
+    #     # Extract features and logits
+    #     features_ind, logits_ind = self.extract_features_and_logits(left_out_ind_dataloader)
+    #     features_ood, logits_ood = self.extract_features_and_logits(ood_dataloader)
+
+    #     # ================ MSP ================ #
+    #     msp = MSP(self.model, self.config.ood)
+    #     msp_scores_ind, is_ood_msp_ind = msp.predict_ood_msp(logits_ind)
+    #     msp_scores_ood, is_ood_msp_ood = msp.predict_ood_msp(logits_ood)
+
+    #     # ================ ODIN ================ #
+    #     odin = ODINDetector(self.model, self.config.ood)
+    #     odin_scores_ind, is_ood_odin_ind = odin.predict_ood_odin(left_out_ind_dataloader)
+    #     odin_scores_ood, is_ood_odin_ood = odin.predict_ood_odin(ood_dataloader)
+
+    #     return {
+    #         "msp": {
+    #             "scores_ind": msp_scores_ind,
+    #             "is_ood_ind": is_ood_msp_ind,
+    #             "scores_ood": msp_scores_ood,
+    #             "is_ood_ood": is_ood_msp_ood
+    #         },
+    #         "odin": {
+    #             "scores_ind": odin_scores_ind,
+    #             "is_ood_ind": is_ood_odin_ind,
+    #             "scores_ood": odin_scores_ood,
+    #             "is_ood_ood": is_ood_odin_ood
+    #         }
+    #     }
 
 
     # def _ensure_batch_format(self, input: torch.utils.data.DataLoader) -> Tuple[torch.Tensor, torch.Tensor]:

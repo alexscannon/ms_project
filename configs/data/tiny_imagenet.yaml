@@ -3,6 +3,8 @@ location: /content/drive/MyDrive/data/tinyimagenet/ # Root directory for the Tin
 
 # --- Dataset Characteristics ---
 num_classes: 200  # Tiny ImageNet has 200 classes
+num_ind_classes: 160 # Number of in-distribution classes
+num_ood_classes: 40 # Number of out-of-distribution classes
 image_size: 64    # Original image size (height and width) for Tiny ImageNet
 channels: 3       # Number of image channels (e.g., 3 for RGB)
 
@@ -21,6 +23,6 @@ std: [0.229, 0.224, 0.225]  # Example: ImageNet std for normalization
 
 # --- Optional: Data Loader Parameters ---
 # These might also be part of a main training configuration.
-batch_size: 128
+batch_size: 64
 num_workers: 4
 pin_memory: true
