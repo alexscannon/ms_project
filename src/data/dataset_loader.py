@@ -63,11 +63,27 @@ def create_datasets(config: DictConfig, checkpoint_data: dict) -> Tuple[torch.ut
     if hasattr(checkpoint_data, 'pretrained_ind_indices'):
         pretrained_ind_indices = checkpoint_data['pretrained_ind_indices']
     else:
-        # Get all the in-distribution class indicies
-        all_ind_indices = list(range(len(dataset_wrapper.train)))
-        # Of the pretrain classes, get the indices that are not the left out indices
+        # Get pretrain_classes to properly filter samples
+        pretrain_classes = class_info.get('pretrain_classes', None)
+        if pretrain_classes is None:
+            raise ValueError("'pretrain_classes' is missing from class_info. Cannot compute pretrained_ind_indices.")
+
+        pretrain_class_set = set(pretrain_classes)
         left_out_ind_indices_set = set(left_out_ind_indices)
-        pretrained_ind_indices = [i for i in all_ind_indices if i not in left_out_ind_indices_set]
+
+        # Find samples that belong to pretrain classes but are not in left_out_ind_indices
+        pretrained_ind_indices = []
+        try:
+            # Efficient way if targets attribute exists (like in torchvision CIFAR datasets)
+            for i, label in enumerate(dataset_wrapper.train.targets):
+                if label in pretrain_class_set and i not in left_out_ind_indices_set:
+                    pretrained_ind_indices.append(i)
+        except AttributeError:
+            # Slower fallback if .targets is not directly available
+            logging.warning("dataset_wrapper.train.targets not found, iterating to find pretrain samples. This might be slow.")
+            for i, (_, label) in enumerate(dataset_wrapper.train):
+                if label in pretrain_class_set and i not in left_out_ind_indices_set:
+                    pretrained_ind_indices.append(i)
 
     # Create ID dataset (samples from pretrain classes)
     pretrained_ind_subset = Subset(dataset_wrapper.train, pretrained_ind_indices)
