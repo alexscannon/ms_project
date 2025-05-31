@@ -93,7 +93,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
 
     ood_subset = Subset(dataset_wrapper.train, ood_sample_indices)
     ood_dataloader = DataLoader(
-        ood_subset,
+        dataset=ood_subset, # No label remapping needed for OOD dataset because it is not used for fitting the OOD detector
         batch_size=config.data.batch_size,
         shuffle=True,
         num_workers=config.data.num_workers,
@@ -102,6 +102,6 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
 
     logging.info(f"Created ID dataset with {len(pretrained_ind_dataloader)} samples from {len(pretrained_ind_indices)} classes")
     logging.info(f"Created Left-Out ID dataset with {len(left_out_ind_dataloader)} samples from {len(left_out_ind_indices)} classes")
-    logging.info(f"Created OOD dataset with {len(ood_dataloader)} samples from {len(class_info['continual_classes'])} classes")
+    logging.info(f"Created OOD dataset with {len(ood_dataloader)} samples from {len(left_out_classes)} classes")
 
     return left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader

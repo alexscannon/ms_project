@@ -12,7 +12,7 @@ from src.models.ood.ood_detector import OODDetector
 def main(config: DictConfig):
     logging.info(f"Configuration: {OmegaConf.to_yaml(config)}")
 
-    # ============== Experiment setup ============== #
+    # ============================ Experiment setup ============================ #
     # Determine device
     if torch.cuda.is_available() and hasattr(config, 'system') and hasattr(config.system, 'device') and 'cuda' in config.system.device:
         device = torch.device(config.system.device)
@@ -22,12 +22,14 @@ def main(config: DictConfig):
         device = torch.device("cpu")
     logging.info(f"Using device: {device}")
 
-    # ============== Load pre-trained model ============== #
+
+    # ============================ Load pre-trained model ============================ #
     logging.info("Loading pre-trained Vision Transformer model...")
     checkpoint_data = get_checkpoint_dict(config.data.name, config, device)
     model = VisionTransformer(config=config, checkpoint_data=checkpoint_data)
 
-    # ============== OOD detection ============== #
+
+    # ============================ OOD detection ============================ #
     # Load remaining ID and OOD datasets
     logging.info("Loading remaining ID and the OOD datasets...")
     left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader = create_ood_detection_datasets(config, checkpoint_data)

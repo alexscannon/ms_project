@@ -1,11 +1,9 @@
-import os
 from typing import Dict
 import torch
 import torch.nn as nn
 from omegaconf import DictConfig
 from timm import create_model
-import logging # Import logging
-from src.utils import get_checkpoint_dict
+import logging
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

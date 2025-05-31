@@ -2,7 +2,7 @@ import torch
 
 class ClassRemappingDataset(torch.utils.data.Dataset):
     """
-    A dataset wrapper that remaps class labels.
+    A dataset wrapper that remaps class labels given the ViT was trained on a subset of the classes.
     """
     def __init__(self, dataset: torch.utils.data.Dataset, class_mapping: dict):
         """
