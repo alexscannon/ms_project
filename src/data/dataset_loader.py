@@ -25,7 +25,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         checkpoint_data (dict): Checkpoint dictionary containing 'class_info'.
                                 'class_info' is expected to follow the structure from
                                 pre-training, including 'pretrain_classes', 'left_out_classes',
-                                'pretrained_ind_indices', 'left_out_ind_indices', and 'class_mapping'.
+                                'pretrained_ind_indices', 'left_out_ind_indices', and 'ind_class_mapping'.
     Returns:
         left_out_ind_dataloader (torch.utils.data.DataLoader): DataLoader for ID samples not used for OOD fitting (original labels).
         ood_dataloader (torch.utils.data.DataLoader): DataLoader for OOD samples (original labels).
@@ -44,16 +44,17 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
 
     # Create Left-Out IND dataset (samples from pretrain classes)
     left_out_ind_indices = class_info.get('left_out_indices', None)
+    logging.info(f"Found {len(left_out_ind_indices)} left out indices")
     if left_out_ind_indices is None:
         raise ValueError("'left_out_indices' is missing from class_info. Cannot create Left-Out IND dataloader.")
 
-    class_mapping = class_info.get('class_mapping', None)
-    if class_mapping is None:
-        raise ValueError("'class_mapping' is missing from class_info. Cannot create Left-Out IND dataloader.")
+    ind_class_mapping = class_info.get('class_mapping', None) # TODO: After another training run is conducted, change the key to 'ind_class_mapping'
+    if ind_class_mapping is None:
+        raise ValueError("'class_mapping' is missing from class_info. Cannot create Left-Out IND dataloader.") # TODO: After another training run is conducted, change the key to 'ind_class_mapping'
 
     left_out_ind_subset = Subset(dataset_wrapper.train, left_out_ind_indices)
     left_out_ind_dataloader = DataLoader(
-        dataset=ClassRemappingDataset(left_out_ind_subset, class_mapping),
+        dataset=ClassRemappingDataset(left_out_ind_subset, ind_class_mapping),
         batch_size=config.data.batch_size,
         shuffle=True, # Shuffle for fitting
         num_workers=config.data.num_workers,
@@ -68,11 +69,11 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         all_ind_indices = list(range(len(dataset_wrapper.train)))
         # Of the pretrain classes, get the indices that are not the left out indices
         pretrained_ind_indices = [i for i in all_ind_indices if i not in left_out_ind_indices]
-
+    logging.info(f"Found {len(pretrained_ind_indices)} pretrain indices")
     # Create ID dataset (samples from pretrain classes)
     pretrained_ind_subset = Subset(dataset_wrapper.train, pretrained_ind_indices)
     pretrained_ind_dataloader = DataLoader(
-        dataset=ClassRemappingDataset(pretrained_ind_subset, class_mapping),
+        dataset=ClassRemappingDataset(pretrained_ind_subset, ind_class_mapping),
         batch_size=config.data.batch_size,
         shuffle=True,
         num_workers=config.data.num_workers,
@@ -105,8 +106,8 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         pin_memory=config.data.pin_memory
     )
 
-    logging.info(f"Created ID dataset with {len(pretrained_ind_dataloader)} samples from {len(pretrained_ind_indices)} classes")
-    logging.info(f"Created Left-Out ID dataset with {len(left_out_ind_dataloader)} samples from {len(left_out_ind_indices)} classes")
-    logging.info(f"Created OOD dataset with {len(ood_dataloader)} samples from {len(left_out_classes)} classes")
+    logging.info(f"Created ID dataset with {len(pretrained_ind_dataloader)} samples...")
+    logging.info(f"Created Left-Out ID dataset with {len(left_out_ind_dataloader)} samples...")
+    logging.info(f"Created OOD dataset with {len(ood_dataloader)} samples...")
 
     return left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader

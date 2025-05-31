@@ -22,7 +22,7 @@ def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: str) -> d
                 'pretrain_classes': pretrain_class_indicies,
                 'left_out_classes': ood_class_indicies, # Old name for this property "continual_classes"
                 'left_out_ind_indices': pretrained_left_out_indices, # Old name for this property "left_out_indices"
-                'class_mapping': class_mapping
+                'pretrain_class_mapping': pretrain_class_mapping # Old name for this property "class_mapping"
             }
         }
     """
