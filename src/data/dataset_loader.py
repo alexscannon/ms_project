@@ -1,8 +1,7 @@
 from typing import Tuple
 from omegaconf import DictConfig
 import torch
-from torchvision import datasets, transforms
-import os
+from torchvision import datasets
 import logging
 from torch.utils.data import Subset, DataLoader
 
@@ -44,7 +43,6 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
 
     # Create Left-Out IND dataset (samples from pretrain classes)
     left_out_ind_indices = class_info.get('left_out_indices', None)
-    logging.info(f"Found {len(left_out_ind_indices)} left out indices")
     if left_out_ind_indices is None:
         raise ValueError("'left_out_indices' is missing from class_info. Cannot create Left-Out IND dataloader.")
 
@@ -53,7 +51,6 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         raise ValueError("'class_mapping' is missing from class_info. Cannot create Left-Out IND dataloader.") # TODO: After another training run is conducted, change the key to 'ind_class_mapping'
 
     left_out_ind_subset = Subset(dataset_wrapper.train, left_out_ind_indices)
-    logging.info(f"left_out_ind_subset length: {len(left_out_ind_subset)}")
     left_out_ind_dataloader = DataLoader(
         dataset=ClassRemappingDataset(left_out_ind_subset, ind_class_mapping),
         batch_size=config.data.batch_size,
@@ -61,7 +58,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         num_workers=config.data.num_workers,
         pin_memory=config.data.pin_memory
     )
-    logging.info(f"left_out_ind_dataloader length: {len(left_out_ind_dataloader)}")
+
     # TODO: Temporary fix for the checkpoint data structure until new training run is conducted (#3 -> #4)
     if hasattr(checkpoint_data, 'pretrained_ind_indices'):
         pretrained_ind_indices = checkpoint_data['pretrained_ind_indices']
@@ -70,10 +67,9 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         all_ind_indices = list(range(len(dataset_wrapper.train)))
         # Of the pretrain classes, get the indices that are not the left out indices
         pretrained_ind_indices = [i for i in all_ind_indices if i not in left_out_ind_indices]
-    logging.info(f"Found {len(pretrained_ind_indices)} pretrain indices")
+
     # Create ID dataset (samples from pretrain classes)
     pretrained_ind_subset = Subset(dataset_wrapper.train, pretrained_ind_indices)
-    logging.info(f"pretrained_ind_subset length: {len(pretrained_ind_subset)}")
     pretrained_ind_dataloader = DataLoader(
         dataset=ClassRemappingDataset(pretrained_ind_subset, ind_class_mapping),
         batch_size=config.data.batch_size,
@@ -81,15 +77,14 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         num_workers=config.data.num_workers,
         pin_memory=config.data.pin_memory
     )
-    logging.info(f"pretrained_ind_dataloader length: {len(pretrained_ind_dataloader)}")
+
     # Create OOD dataset (samples from 'left_out_classes')
     # TODO: After another training run is conducted, change the key to 'left_out_classes'
     left_out_classes = class_info.get('continual_classes', None)
     if left_out_classes is None:
         raise ValueError("'continual_classes' is missing from class_info. Cannot create OOD dataloader.")
-    logging.info(f"Found {len(left_out_classes)} left out classes")
-    logging.info(f"Left out classes: {left_out_classes}")
-    logging.info(f"Training set targets: {dataset_wrapper.train.targets}")
+
+    # Get the indices of the OOD samples
     ood_class_label_set = set(left_out_classes)
     try:
         # Efficient way if targets attribute exists (like in torchvision CIFAR datasets)
@@ -98,7 +93,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         # Slower fallback if .targets is not directly available
         logging.warning("dataset_wrapper.train.targets not found, iterating to find OOD samples. This might be slow.")
         ood_sample_indices = [i for i, (_, label) in enumerate(dataset_wrapper.train) if label in ood_class_label_set]
-    logging.info(f"Found {len(ood_sample_indices)} OOD samples")
+
     ood_subset = Subset(dataset_wrapper.train, ood_sample_indices)
     ood_dataloader = DataLoader(
         dataset=ood_subset, # No label remapping needed for OOD dataset because it is not used for fitting the OOD detector
@@ -108,8 +103,8 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         pin_memory=config.data.pin_memory
     )
 
-    logging.info(f"Created ID dataset with {len(pretrained_ind_dataloader)} samples...")
-    logging.info(f"Created Left-Out ID dataset with {len(left_out_ind_dataloader)} samples...")
-    logging.info(f"Created OOD dataset with {len(ood_dataloader)} samples...")
-    breaker = class_info['TODO']
+    logging.info(f"left_out_ind_subset length: {len(left_out_ind_subset)}")
+    logging.info(f"pretrained_ind_subset length: {len(pretrained_ind_subset)}")
+    logging.info(f"ood_subset length: {len(ood_subset)}")
+
     return left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader
