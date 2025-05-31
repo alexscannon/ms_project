@@ -82,6 +82,8 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
     if left_out_classes is None:
         raise ValueError("'left_out_classes' or 'continual_classes' is missing from class_info. Cannot create OOD dataloader.")
     logging.info(f"Found {len(left_out_classes)} left out classes")
+    logging.info(f"Left out classes: {left_out_classes}")
+    logging.info(f"Training set targets: {dataset_wrapper.train.targets}")
     ood_class_label_set = set(left_out_classes)
     try:
         # Efficient way if targets attribute exists (like in torchvision CIFAR datasets)
