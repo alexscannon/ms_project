@@ -13,7 +13,7 @@ DATASET_REGISTRY = {
     'tiny_imagenet': datasets.ImageFolder,
 }
 
-def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+def create_datasets(config: DictConfig, checkpoint_data: dict) -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
     """
     Create ID and OOD datasets based on class_info from the checkpoint object.
     The `pretrained_ind_dataloader` will have its labels remapped for fitting OOD detectors
@@ -66,7 +66,8 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         # Get all the in-distribution class indicies
         all_ind_indices = list(range(len(dataset_wrapper.train)))
         # Of the pretrain classes, get the indices that are not the left out indices
-        pretrained_ind_indices = [i for i in all_ind_indices if i not in left_out_ind_indices]
+        left_out_ind_indices_set = set(left_out_ind_indices)
+        pretrained_ind_indices = [i for i in all_ind_indices if i not in left_out_ind_indices_set]
 
     # Create ID dataset (samples from pretrain classes)
     pretrained_ind_subset = Subset(dataset_wrapper.train, pretrained_ind_indices)

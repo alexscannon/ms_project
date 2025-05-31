@@ -4,7 +4,7 @@ import torch
 from src.models.backbone.vit import VisionTransformer
 import logging
 
-from src.data.dataset_loader import create_ood_detection_datasets
+from src.data.dataset_loader import create_datasets
 from src.utils import get_checkpoint_dict
 from src.models.ood.ood_detector import OODDetector
 
@@ -32,7 +32,7 @@ def main(config: DictConfig):
     # ============================ OOD detection ============================ #
     # Load remaining ID and OOD datasets
     logging.info("Loading remaining ID and the OOD datasets...")
-    left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader = create_ood_detection_datasets(config, checkpoint_data)
+    left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader = create_datasets(config, checkpoint_data)
 
     # Create OOD detector
     logging.info("Creating OOD detector...")
