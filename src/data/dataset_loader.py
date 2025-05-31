@@ -31,8 +31,9 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         ood_dataloader (torch.utils.data.DataLoader): DataLoader for OOD samples (original labels).
         pretrained_ind_dataloader (torch.utils.data.DataLoader): DataLoader for ID samples used for OOD fitting (remapped labels).
     """
-    # TODO: After another training run is conducted (#3 -> #4), remove the 'continual_classes' fallback
-    class_info = checkpoint_data.get('class_info', 'continual_classes')
+    class_info = checkpoint_data.get('class_info', None)
+    if class_info is None:
+        raise ValueError("'class_info' is missing from checkpoint_data. Cannot create OOD dataloaders.")
 
     if config.data.name == 'cifar100':
         dataset_wrapper = CIFAR100Dataset(config)
@@ -45,6 +46,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
     left_out_ind_indices = class_info.get('left_out_indices', None)
     if left_out_ind_indices is None:
         raise ValueError("'left_out_indices' is missing from class_info. Cannot create Left-Out IND dataloader.")
+
     class_mapping = class_info.get('class_mapping', None)
     if class_mapping is None:
         raise ValueError("'class_mapping' is missing from class_info. Cannot create Left-Out IND dataloader.")
@@ -78,9 +80,10 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
     )
 
     # Create OOD dataset (samples from 'left_out_classes')
-    left_out_classes = class_info.get('left_out_classes', 'continual_classes')
+    # TODO: After another training run is conducted, change the key to 'left_out_classes'
+    left_out_classes = class_info.get('continual_classes', None)
     if left_out_classes is None:
-        raise ValueError("'left_out_classes' or 'continual_classes' is missing from class_info. Cannot create OOD dataloader.")
+        raise ValueError("'continual_classes' is missing from class_info. Cannot create OOD dataloader.")
     logging.info(f"Found {len(left_out_classes)} left out classes")
     logging.info(f"Left out classes: {left_out_classes}")
     logging.info(f"Training set targets: {dataset_wrapper.train.targets}")
