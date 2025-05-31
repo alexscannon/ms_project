@@ -26,6 +26,7 @@ def main(config: DictConfig):
     # ============================ Load pre-trained model ============================ #
     logging.info("Loading pre-trained Vision Transformer model...")
     checkpoint_data = get_checkpoint_dict(config.data.name, config, device)
+    logging.info(f"checkpoint_data: {checkpoint_data}")
     model = VisionTransformer(config=config, checkpoint_data=checkpoint_data)
 
 
