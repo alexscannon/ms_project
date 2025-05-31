@@ -49,10 +49,12 @@ class MahalanobisDetector:
 
         # Collect features for each class
         first_batch_features = None
+        pbar = tqdm(train_ind_dataloader, desc="Mahalanobis Fit: Extracting Features...")
         with torch.no_grad():
-            for batch in tqdm(train_ind_dataloader, desc="Mahalanobis Fit: Extracting Features"):
+            for _, batch in enumerate(pbar):
                 if isinstance(batch, (list, tuple)): # Batch has two elements: x (input) and y (labels)
-                    x, y = batch[0].to(self.device), batch[1].to(self.device)
+                    x = batch[0].to(self.device) # shape: (B, C, H, W)
+                    y = batch[1].to(self.device) # shape: (B,)
                 else:
                     x = batch.to(self.device)
                     y = None
@@ -62,6 +64,8 @@ class MahalanobisDetector:
                 if first_batch_features is None:
                     first_batch_features = features
 
+                # All the y values must be in the range [0, self.expected_num_classes - 1]
+                # For each in-distribution class, link any examples that have that class label to their extracted features
                 for i in range(self.expected_num_classes):
                     class_mask = (y == i)
                     if class_mask.any():
@@ -69,11 +73,15 @@ class MahalanobisDetector:
 
         if first_batch_features is None:
             raise ValueError("Cannot fit Mahalanobis detector: training dataloader is empty or feature_extractor_fn did not yield features.")
+        logging.info(f"all_features_list shape: {all_features_list.shape}")
+        # all_features_list is a list of lists, each list contains the features for a single class
+        # all_features shape: (n_classes, n_samples, D)
+        # Concatenate all the features for each class into a single tensor
+        class_features = torch.cat(all_features_list, dim=0) # shape: (n_classes, )
+        logging.info(f"class_features shape: {class_features.shape}")
 
-        class_features = [torch.cat(fl, dim=0) if fl else torch.empty(0, first_batch_features.shape[-1]) for fl in all_features_list]
-
-        # Compute class means only for classes with samples
-        active_class_indices = [i for i, cf in enumerate(class_features) if cf.shape[0] > 0]
+        # Compute class means
+        active_class_indices = [i for i, class_feature in enumerate(class_features) if class_feature.shape[0] > 0]
         if not active_class_indices:
             raise ValueError("No class has any samples in the training data for Mahalanobis fitting.")
 

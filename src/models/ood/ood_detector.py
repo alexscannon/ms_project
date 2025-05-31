@@ -27,7 +27,7 @@ class OODDetector:
         self.detectors = {
             "msp": MSP(self.model, self.config.ood),
             "odin": ODINDetector(self.model, self.config.ood),
-            # "mahalanobis": MahalanobisDetector(self.model, self.config.ood, device=self.device)
+            "mahalanobis": MahalanobisDetector(self.model, self.config.ood, device=self.device)
         }
 
 
@@ -42,7 +42,11 @@ class OODDetector:
             dict: Dictionary containing the OOD detection scores and labels
         """
         # Fit the Mahalanobis detector
-        # self.detectors["mahalanobis"].fit(pretrained_ind_dataloader, self.extract_features_and_logits, self.config.data.num_ind_classes)
+        self.detectors["mahalanobis"].fit(
+            pretrained_ind_dataloader,
+            self.extract_features_and_logits,
+            self.config.data.num_ind_classes
+        )
 
         logging.info("Computing OOD detection scores for left-out in-distribution dataset...")
         left_out_ind_stats: dict = self.compute_data_ood_stats(left_out_ind_dataloader)

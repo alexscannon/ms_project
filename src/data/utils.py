@@ -24,6 +24,8 @@ class ClassRemappingDataset(torch.utils.data.Dataset):
                 f"Ensure the input dataset to ClassRemappingDataset only contains samples "
                 f"from the classes defined in the class_mapping."
             )
+        # Remap the original target to the new target (e.g., 23 -> 0, 11 -> 1, 93 -> 2, ...)
+        # New target is in the range [0, self.expected_num_classes - 1]
         new_target = self.class_mapping[original_target]
         return img, new_target
 
