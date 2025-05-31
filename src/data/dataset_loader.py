@@ -80,7 +80,7 @@ def create_datasets(config: DictConfig, checkpoint_data: dict) -> Tuple[torch.ut
                     pretrained_ind_indices.append(i)
         except AttributeError:
             # Slower fallback if .targets is not directly available
-            logging.warning("dataset_wrapper.train.targets not found, iterating to find pretrain samples. This might be slow.")
+            logging.warning("dataset_wrapper.train.targets not found, iterating to find pretrain samples. This might be slow...")
             for i, (_, label) in enumerate(dataset_wrapper.train):
                 if label in pretrain_class_set and i not in left_out_ind_indices_set:
                     pretrained_ind_indices.append(i)

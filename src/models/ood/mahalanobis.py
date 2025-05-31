@@ -91,7 +91,7 @@ class MahalanobisDetector:
                 class_features.append(empty_tensor)
 
         logging.info(f"Processed features for {len(class_features)} classes")
-        logging.info(f"class_features shape: {class_features.shape}")
+        logging.info(f"class_features shape: ({len(class_features[0])},{len(class_features[1])})")
 
         # Compute class means
         active_class_indices = [i for i, class_feature in enumerate(class_features) if class_feature.shape[0] > 0]
