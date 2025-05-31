@@ -73,7 +73,7 @@ class MahalanobisDetector:
 
         if first_batch_features is None:
             raise ValueError("Cannot fit Mahalanobis detector: training dataloader is empty or feature_extractor_fn did not yield features.")
-        logging.info(f"all_features_list shape: {all_features_list.shape}")
+        logging.info(f"all_features_list shape: ({len(all_features_list[0])},{len(all_features_list[1])})")
         # all_features_list is a list of lists, each list contains the features for a single class
         # all_features shape: (n_classes, n_samples, D)
         # Concatenate all the features for each class into a single tensor
