@@ -1,5 +1,5 @@
 import torch
-
+import logging
 class ClassRemappingDataset(torch.utils.data.Dataset):
     """
     A dataset wrapper that remaps class labels given the ViT was trained on a subset of the classes.
@@ -11,6 +11,7 @@ class ClassRemappingDataset(torch.utils.data.Dataset):
             class_mapping (dict): A dictionary mapping original class labels
                                   to new, consecutive class labels (e.g., {orig_label: new_label}).
         """
+        logging.info(f"ClassRemappingDataset length: {len(dataset)}")
         self.dataset = dataset
         self.class_mapping = class_mapping
 
