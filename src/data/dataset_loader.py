@@ -53,6 +53,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         raise ValueError("'class_mapping' is missing from class_info. Cannot create Left-Out IND dataloader.") # TODO: After another training run is conducted, change the key to 'ind_class_mapping'
 
     left_out_ind_subset = Subset(dataset_wrapper.train, left_out_ind_indices)
+    logging.info(f"left_out_ind_subset length: {len(left_out_ind_subset)}")
     left_out_ind_dataloader = DataLoader(
         dataset=ClassRemappingDataset(left_out_ind_subset, ind_class_mapping),
         batch_size=config.data.batch_size,
@@ -60,7 +61,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         num_workers=config.data.num_workers,
         pin_memory=config.data.pin_memory
     )
-
+    logging.info(f"left_out_ind_dataloader length: {len(left_out_ind_dataloader)}")
     # TODO: Temporary fix for the checkpoint data structure until new training run is conducted (#3 -> #4)
     if hasattr(checkpoint_data, 'pretrained_ind_indices'):
         pretrained_ind_indices = checkpoint_data['pretrained_ind_indices']
@@ -72,6 +73,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
     logging.info(f"Found {len(pretrained_ind_indices)} pretrain indices")
     # Create ID dataset (samples from pretrain classes)
     pretrained_ind_subset = Subset(dataset_wrapper.train, pretrained_ind_indices)
+    logging.info(f"pretrained_ind_subset length: {len(pretrained_ind_subset)}")
     pretrained_ind_dataloader = DataLoader(
         dataset=ClassRemappingDataset(pretrained_ind_subset, ind_class_mapping),
         batch_size=config.data.batch_size,
@@ -79,7 +81,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         num_workers=config.data.num_workers,
         pin_memory=config.data.pin_memory
     )
-
+    logging.info(f"pretrained_ind_dataloader length: {len(pretrained_ind_dataloader)}")
     # Create OOD dataset (samples from 'left_out_classes')
     # TODO: After another training run is conducted, change the key to 'left_out_classes'
     left_out_classes = class_info.get('continual_classes', None)
