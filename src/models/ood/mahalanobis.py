@@ -77,7 +77,20 @@ class MahalanobisDetector:
         # all_features_list is a list of lists, each list contains the features for a single class
         # all_features shape: (n_classes, n_samples, D)
         # Concatenate all the features for each class into a single tensor
-        class_features = torch.cat(all_features_list, dim=0) # shape: (n_classes, )
+        # Concatenate all features for each class (handle the list of lists structure)
+        class_features = []
+        for i in range(self.expected_num_classes):
+            if len(all_features_list[i]) > 0:
+                # Concatenate all tensors for this class
+                class_feature_tensor = torch.cat(all_features_list[i], dim=0)
+                class_features.append(class_feature_tensor)
+            else:
+                # No samples for this class, create empty tensor with correct shape
+                feature_dim = first_batch_features.shape[1]
+                empty_tensor = torch.empty(0, feature_dim)
+                class_features.append(empty_tensor)
+
+        logging.info(f"Processed features for {len(class_features)} classes")
         logging.info(f"class_features shape: {class_features.shape}")
 
         # Compute class means
