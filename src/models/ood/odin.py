@@ -75,20 +75,19 @@ class ODINDetector:
             preprocessed_input (torch.Tensor): Preprocessed input tensor
         """
         with torch.enable_grad(): # explicity turn on gradient computation
-            x = x.clone().detach() # Clone the input tensor
-            x.requires_grad = True # Compute gradients for the cloned input tensor
+            x = x.clone().detach() # Clone the input tensor so that we don't modify the original tensor
+            x.requires_grad = True # Compute gradients for the cloned input tensor in order to compute the gradient vector
 
             # Forward pass
             logits = self.model(x) / self.temperature # Temperature scaling
 
-            # ODIN perturbs inputs to increase confidence in the predicted class.
-            # So, the loss for gradient calculation should be based on the predicted class.
+            # Compute the predicted labels
             predicted_labels = torch.argmax(logits, dim=1)
 
             # Compute the loss
             if self.criterion == "NLL":
                 # loss = F.nll_loss(logits, y) TODO: Look into if this is correct
-                loss = F.nll_loss(F.log_softmax(logits, dim=1), predicted_labels)
+                loss = F.nll_loss(F.log_softmax(logits, dim=1), predicted_labels) # ODIN uses the predicted labels to compute the loss
             elif self.criterion == "CE":
                 loss = F.cross_entropy(logits, predicted_labels)
             else:

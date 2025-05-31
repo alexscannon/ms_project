@@ -90,7 +90,7 @@ def create_ood_detection_datasets(config: DictConfig, checkpoint_data: dict) -> 
         # Slower fallback if .targets is not directly available
         logging.warning("dataset_wrapper.train.targets not found, iterating to find OOD samples. This might be slow.")
         ood_sample_indices = [i for i, (_, label) in enumerate(dataset_wrapper.train) if label in ood_class_label_set]
-
+    logging.info(f"Found {len(ood_sample_indices)} OOD samples")
     ood_subset = Subset(dataset_wrapper.train, ood_sample_indices)
     ood_dataloader = DataLoader(
         dataset=ood_subset, # No label remapping needed for OOD dataset because it is not used for fitting the OOD detector

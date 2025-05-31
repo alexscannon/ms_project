@@ -104,7 +104,7 @@ class OODDetector:
         }
 
         pbar = tqdm(dataloader, desc=f"Computing OOD detection scores ...")
-        for batch_idx, batch in enumerate(pbar): # Iterate over the dataloader
+        for _, batch in enumerate(pbar): # Iterate over the dataloader, tuple is (batch_idx, batch)
             if isinstance(batch, (list, tuple)): # Batch has two elements: x (input) and y (labels)
                 x, y = batch[0], batch[1] if len(batch) > 1 else None
             else:
