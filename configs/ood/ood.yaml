@@ -2,8 +2,7 @@
 threshold: 0.5 # Threshold for OOD detection
 
 energy:
-  temperature: 1000.0
-  epsilon: 0.0014
+  temperature: 1.0 # parameter-free by simply setting T = 1
 msp:
   temperature: 1.0
   threshold: 0.5
