@@ -43,7 +43,8 @@ def main(config: DictConfig):
     # Run OOD detection
     logging.info("Running OOD detection...")
     aurocs = ood_detector.run_ood_detection(left_out_ind_dataloader, ood_dataloader, pretrained_ind_dataloader)
-    logging.info(f"AUROCs: {aurocs}")
+    formatted_aurocs = {k: f"{v * 100:.2f}%" for k, v in aurocs.items()}
+    logging.info(f"AUROCs: {formatted_aurocs}")
 
 if __name__ == "__main__":
     main()

@@ -9,6 +9,7 @@ from sklearn.metrics import roc_auc_score
 import numpy as np
 from tqdm import tqdm
 from src.models.ood.energy import EnergyDetector
+from src.models.ood.knn import KNNDetector
 
 class OODDetector:
     """
@@ -29,7 +30,8 @@ class OODDetector:
             "msp": MSP(self.model, self.config.ood),
             "odin": ODINDetector(self.model, self.config.ood),
             "mahalanobis": MahalanobisDetector(self.model, self.config.ood, device=self.device),
-            "energy": EnergyDetector(self.model, self.config.ood)
+            "energy": EnergyDetector(self.model, self.config.ood),
+            "knn": KNNDetector(self.model, self.config.ood),
         }
 
 
@@ -45,6 +47,13 @@ class OODDetector:
         """
         # Fit the Mahalanobis detector
         self.detectors["mahalanobis"].fit(
+            pretrained_ind_dataloader,
+            self.extract_features_and_logits,
+            self.config.data.num_ind_classes
+        )
+
+        # Fit the KNN detector
+        self.detectors["knn"].fit(
             pretrained_ind_dataloader,
             self.extract_features_and_logits,
             self.config.data.num_ind_classes
@@ -73,6 +82,7 @@ class OODDetector:
         auroc_odin = None
         auroc_mahalanobis = None
         auroc_energy = None
+        auroc_knn = None
 
         if "msp" in self.detectors:
             auroc_msp = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "msp")
@@ -82,12 +92,15 @@ class OODDetector:
             auroc_mahalanobis = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "mahalanobis")
         if "energy" in self.detectors:
             auroc_energy = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "energy")
+        if "knn" in self.detectors:
+            auroc_knn = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "knn")
 
         return {
             "msp": auroc_msp,
             "odin": auroc_odin,
             "mahalanobis": auroc_mahalanobis,
-            "energy": auroc_energy
+            "energy": auroc_energy,
+            "knn": auroc_knn
         }
 
 
@@ -111,6 +124,7 @@ class OODDetector:
                 "msp_scores": [],
                 "mahalanobis_scores": [],
                 "energy_scores": [],
+                "knn_scores": [],
             }
         }
 
@@ -144,6 +158,11 @@ class OODDetector:
                 msp_scores = self.detectors["msp"].get_msp_scores(logits)
                 batch_cache["detector_scores"]["msp_scores"].append(msp_scores)
 
+            # Energy
+            if "energy" in self.detectors:
+                energy_scores = self.detectors["energy"].get_energy_scores(logits)
+                batch_cache["detector_scores"]["energy_scores"].append(energy_scores)
+
             # Mahalanobis
             if "mahalanobis" in self.detectors:
                 mahalanobis_detector = self.detectors["mahalanobis"]
@@ -154,10 +173,15 @@ class OODDetector:
                     logging.warning("Mahalanobis detector is not fitted. Skipping Mahalanobis score computation for this dataloader.")
                     mahalanobis_detector._warned_not_fitted = True # Prevent repeated warnings
 
-            # Energy
-            if "energy" in self.detectors:
-                energy_scores = self.detectors["energy"].get_energy_scores(logits)
-                batch_cache["detector_scores"]["energy_scores"].append(energy_scores)
+            # KNN
+            if "knn" in self.detectors:
+                knn_detector = self.detectors["knn"]
+                if knn_detector.is_fitted:
+                    knn_scores = knn_detector.get_knn_scores(features)
+                    batch_cache["detector_scores"]["knn_scores"].append(knn_scores)
+                elif not hasattr(knn_detector, "_warned_not_fitted"): # Log warning only once
+                    logging.warning("KNN detector is not fitted. Skipping KNN score computation for this dataloader.")
+                    knn_detector._warned_not_fitted = True # Prevent repeated warnings
 
         all_logits = torch.cat(batch_cache["batch_data_info"]["logits"], dim=0) if batch_cache["batch_data_info"]["logits"] else torch.empty(0)
         all_features = torch.cat(batch_cache["batch_data_info"]["features"], dim=0) if batch_cache["batch_data_info"]["features"] else torch.empty(0)
@@ -179,6 +203,10 @@ class OODDetector:
         if batch_cache["detector_scores"]["energy_scores"]:
             all_energy_scores = torch.cat(batch_cache["detector_scores"]["energy_scores"], dim=0)
 
+        all_knn_scores = None
+        if batch_cache["detector_scores"]["knn_scores"]:
+            all_knn_scores = torch.cat(batch_cache["detector_scores"]["knn_scores"], dim=0)
+
         results = {
             "all_logits": all_logits,
             "all_features": all_features,
@@ -192,6 +220,8 @@ class OODDetector:
             results["all_mahalanobis_scores"] = all_mahalanobis_scores
         if all_energy_scores is not None:
             results["all_energy_scores"] = all_energy_scores
+        if all_knn_scores is not None:
+            results["all_knn_scores"] = all_knn_scores
 
         return results
 

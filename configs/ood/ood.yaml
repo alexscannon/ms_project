@@ -15,6 +15,6 @@ mahalanobis:
   temperature: 1000.0 # Temperature scaling parameter
   epsilon: 0.0014 # Magnitude of input preprocessing
   threshold: 0.5
-entropy:
-  temperature: 1000.0 # Temperature scaling parameter
-  epsilon: 0.0014 # Magnitude of input preprocessing
+knn:
+  k: 200 # Number of nearest neighbors. Selected based on original research paper.
+  metric: cosine
