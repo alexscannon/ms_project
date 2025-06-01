@@ -8,6 +8,7 @@ from src.models.ood.mahalanobis import MahalanobisDetector
 from sklearn.metrics import roc_auc_score
 import numpy as np
 from tqdm import tqdm
+from src.models.ood.energy import EnergyDetector
 
 class OODDetector:
     """
@@ -27,7 +28,8 @@ class OODDetector:
         self.detectors = {
             "msp": MSP(self.model, self.config.ood),
             "odin": ODINDetector(self.model, self.config.ood),
-            "mahalanobis": MahalanobisDetector(self.model, self.config.ood, device=self.device)
+            "mahalanobis": MahalanobisDetector(self.model, self.config.ood, device=self.device),
+            "energy": EnergyDetector(self.model, self.config.ood)
         }
 
 
@@ -70,6 +72,7 @@ class OODDetector:
         auroc_msp = None
         auroc_odin = None
         auroc_mahalanobis = None
+        auroc_energy = None
 
         if "msp" in self.detectors:
             auroc_msp = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "msp")
@@ -77,11 +80,14 @@ class OODDetector:
             auroc_odin = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "odin")
         if "mahalanobis" in self.detectors:
             auroc_mahalanobis = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "mahalanobis")
+        if "energy" in self.detectors:
+            auroc_energy = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "energy")
 
         return {
             "msp": auroc_msp,
             "odin": auroc_odin,
-            "mahalanobis": auroc_mahalanobis
+            "mahalanobis": auroc_mahalanobis,
+            "energy": auroc_energy
         }
 
 
@@ -104,6 +110,7 @@ class OODDetector:
                 "odin_scores": [],
                 "msp_scores": [],
                 "mahalanobis_scores": [],
+                "energy_scores": [],
             }
         }
 
@@ -147,6 +154,11 @@ class OODDetector:
                     logging.warning("Mahalanobis detector is not fitted. Skipping Mahalanobis score computation for this dataloader.")
                     mahalanobis_detector._warned_not_fitted = True # Prevent repeated warnings
 
+            # Energy
+            if "energy" in self.detectors:
+                energy_scores = self.detectors["energy"].get_energy_scores(logits)
+                batch_cache["detector_scores"]["energy_scores"].append(energy_scores)
+
         all_logits = torch.cat(batch_cache["batch_data_info"]["logits"], dim=0) if batch_cache["batch_data_info"]["logits"] else torch.empty(0)
         all_features = torch.cat(batch_cache["batch_data_info"]["features"], dim=0) if batch_cache["batch_data_info"]["features"] else torch.empty(0)
         all_labels = torch.cat(batch_cache["batch_data_info"]["labels"], dim=0) if batch_cache["batch_data_info"]["labels"] else torch.empty(0)
@@ -163,6 +175,10 @@ class OODDetector:
         if batch_cache["detector_scores"]["mahalanobis_scores"]:
             all_mahalanobis_scores = torch.cat(batch_cache["detector_scores"]["mahalanobis_scores"], dim=0)
 
+        all_energy_scores = None
+        if batch_cache["detector_scores"]["energy_scores"]:
+            all_energy_scores = torch.cat(batch_cache["detector_scores"]["energy_scores"], dim=0)
+
         results = {
             "all_logits": all_logits,
             "all_features": all_features,
@@ -174,6 +190,8 @@ class OODDetector:
             results["all_msp_scores"] = all_msp_scores
         if all_mahalanobis_scores is not None:
             results["all_mahalanobis_scores"] = all_mahalanobis_scores
+        if all_energy_scores is not None:
+            results["all_energy_scores"] = all_energy_scores
 
         return results
 
@@ -258,15 +276,6 @@ class OODDetector:
             logging.error(f"AUROC calculation failed for {detector_name}: {e}. Scores: {all_scores[:10]}, Labels: {all_labels[:10]}")
             auroc = np.nan # Return NaN if calculation fails (e.g. only one class present in y_true)
         return auroc
-
-
-
-    def get_energy_score(self, input: torch.Tensor) -> torch.Tensor:
-        """Energy score method"""
-        pass
-
-    def get_entropy_score(self, input: torch.Tensor) -> torch.Tensor:
-        pass
 
     # def get_ood_scores(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
     #     """
