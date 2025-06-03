@@ -46,5 +46,6 @@ def main(config: DictConfig):
     formatted_aurocs = {k: f"{v * 100:.2f}%" for k, v in aurocs.items()}
     logging.info(f"AUROCs: {formatted_aurocs}")
 
+
 if __name__ == "__main__":
     main()

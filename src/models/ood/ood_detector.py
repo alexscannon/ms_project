@@ -10,6 +10,7 @@ import numpy as np
 from tqdm import tqdm
 from src.models.ood.energy import EnergyDetector
 from src.models.ood.knn import KNNDetector
+from src.utils import plot_roc_curves
 
 class OODDetector:
     """
@@ -59,14 +60,22 @@ class OODDetector:
             self.config.data.num_ind_classes
         )
 
+        left_out_ind_stats, ood_stats = self.compute_all_ood_stats(left_out_ind_dataloader, ood_dataloader)
+        # Plot ROC curves
+        aurocs: dict = self.calculate_all_aurocs(left_out_ind_stats, ood_stats)
+        logging.info(f"Plotting ROC curves...")
+        plot_roc_curves(left_out_ind_stats, ood_stats, detector_names=list(aurocs.keys()))
+        return aurocs
+
+    def compute_all_ood_stats(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
+        """
+        Compute all OOD detection scores for the left-out in-distribution and out-of-distribution datasets.
+        """
         logging.info("Computing OOD detection scores for left-out in-distribution dataset...")
         left_out_ind_stats: dict = self.compute_data_ood_stats(left_out_ind_dataloader)
-
         logging.info("Computing OOD detection scores for out-of-distribution dataset...")
         ood_stats: dict = self.compute_data_ood_stats(ood_dataloader)
-
-        aurocs: dict = self.calculate_all_aurocs(left_out_ind_stats, ood_stats)
-        return aurocs
+        return left_out_ind_stats, ood_stats
 
 
     def calculate_all_aurocs(self, left_out_ind_stats: dict, ood_stats: dict) -> dict:
