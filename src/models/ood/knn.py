@@ -1,3 +1,5 @@
+from typing import Callable
+from omegaconf import DictConfig
 import torch
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -5,7 +7,7 @@ import logging
 
 
 class KNNDetector:
-    def __init__(self, model, config):
+    def __init__(self, model: torch.nn.Module, config: DictConfig):
         """
         KNN-based OOD detector.
 
@@ -18,13 +20,13 @@ class KNNDetector:
         """
         self.model = model
         self.config = config
-        self.k = getattr(config, 'k', 5)  # Number of neighbors
-        self.metric = getattr(config, 'metric', 'euclidean')  # Distance metric
+        self.k = config.k
+        self.metric = config.metric
 
         self.knn_index = None
         self.is_fitted = False
 
-    def fit(self, dataloader, feature_extractor_fn, num_classes):
+    def fit(self, dataloader: torch.utils.data.DataLoader, feature_extractor_fn: Callable, num_classes: int) -> None:
         """
         Fit the KNN detector by storing features from in-distribution data.
 
@@ -36,6 +38,7 @@ class KNNDetector:
         logging.info(f"Fitting KNN detector with k={self.k} and metric={self.metric}...")
 
         all_features = []
+        device = next(self.model.parameters()).device  # Get the device of the model
 
         with torch.no_grad():
             for batch_idx, batch in enumerate(dataloader):
@@ -43,6 +46,9 @@ class KNNDetector:
                     x, y = batch[0], batch[1] if len(batch) > 1 else None
                 else:
                     x, y = batch, None
+
+                # Move data to the same device as the model
+                x = x.to(device)
 
                 # Extract features using the provided function
                 features, _ = feature_extractor_fn(x)
@@ -72,7 +78,7 @@ class KNNDetector:
         self.is_fitted = True
         logging.info("KNN detector fitting completed.")
 
-    def get_knn_scores(self, features):
+    def get_knn_scores(self, features: torch.Tensor) -> torch.Tensor:
         """
         Compute KNN-based OOD scores.
 
