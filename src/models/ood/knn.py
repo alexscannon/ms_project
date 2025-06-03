@@ -20,8 +20,8 @@ class KNNDetector:
         """
         self.model = model
         self.config = config
-        self.k = config.k
-        self.metric = config.metric
+        self.k = config.knn.k
+        self.metric = config.knn.metric
 
         self.knn_index = None
         self.is_fitted = False
