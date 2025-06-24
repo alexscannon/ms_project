@@ -1,8 +1,11 @@
 import torch
 from omegaconf import DictConfig
-import numpy as np
 from tqdm import tqdm
 import logging
+from torch import device as TorchDevice
+from typing import Callable
+
+
 
 class MahalanobisDetector:
     """
@@ -11,7 +14,7 @@ class MahalanobisDetector:
     Scores are negative Mahalanobis distances (higher is more in-distribution).
     """
 
-    def __init__(self, model: torch.nn.Module, ood_config: DictConfig, device: str = 'cuda'):
+    def __init__(self, model: torch.nn.Module, ood_config: DictConfig, device: TorchDevice = torch.device('cuda')):
         self.model = model # Used to infer feature dimensionality if needed, but fit takes feature_extractor
         self.ood_config = ood_config
         self.device = device
@@ -32,7 +35,7 @@ class MahalanobisDetector:
         """
         return self.class_means is not None and self.precision_matrix is not None
 
-    def fit(self, train_ind_dataloader: torch.utils.data.DataLoader, feature_extractor_fn: callable, num_ind_classes: int) -> None:
+    def fit(self, train_ind_dataloader: torch.utils.data.DataLoader, feature_extractor_fn: Callable, num_ind_classes: int) -> None:
         """
         Fit the Mahalanobis detector by computing class means and shared precision matrix.
 
@@ -118,7 +121,7 @@ class MahalanobisDetector:
         reg_cov = cov + torch.eye(cov.shape[0], device=self.device) * self.covariance_reg
         try:
             self.precision_matrix = torch.linalg.inv(reg_cov).to(self.device)
-        except torch.linalg.LinAlgError:
+        except RuntimeError:
             logging.warning("Mahalanobis: Covariance matrix inversion failed. Using pseudo-inverse.")
             self.precision_matrix = torch.linalg.pinv(reg_cov).to(self.device)
 
@@ -138,6 +141,8 @@ class MahalanobisDetector:
         """
         if not self.is_fitted:
             raise RuntimeError("Mahalanobis detector has not been fitted. Call fit() first.")
+        assert self.precision_matrix is not None
+        assert self.class_means is not None
 
         features = features.to(self.device)
         batch_size = features.shape[0]

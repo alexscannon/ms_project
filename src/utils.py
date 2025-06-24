@@ -3,8 +3,13 @@ from typing import Dict, List, Optional, Tuple
 from omegaconf import DictConfig
 import torch
 import logging
+from torch import device as TorchDevice
+import numpy as np
+from matplotlib import pyplot as plt
+from sklearn.metrics import roc_curve, auc
 
-def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: str) -> dict:
+
+def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: TorchDevice) -> dict:
     """
     Get the checkpoint dictionary for the given dataset.
     Args:
@@ -28,11 +33,13 @@ def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: str) -> d
         }
     """
     # Only CIFAR-100 has a separate checkpoint directory
-    logging.info(f"Loading checkpoint for {dataset_name} from {config.model.backbone.location}")
+    logging.info(f"Loading checkpoint for {dataset_name} dataset...")
     if dataset_name == 'cifar100':
-        checkpoint_path = os.path.join(config.model.backbone.location, dataset_name, config.model.backbone.model_filename)
+        checkpoint_path = config.model.backbone.cifar100_location
+    elif dataset_name == 'tiny_imagenet':
+        checkpoint_path = config.model.backbone.tiny_imagenet_location
     else:
-        checkpoint_path = os.path.join(config.model.backbone.location, config.model.backbone.model_filename)
+        raise NotImplementedError(f"[Error] Checkpoint data not supported for {dataset_name}")
 
     if not os.path.exists(checkpoint_path):
         logging.error(f"Checkpoint file not found at {checkpoint_path}")
@@ -40,12 +47,13 @@ def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: str) -> d
 
     # --- Load Checkpoint ---
     try:
-        checkpoint_data = torch.load(checkpoint_path, map_location=device) # Load directly to target device if possible
+        checkpoint_data = torch.load(checkpoint_path, map_location=device, weights_only=False) # Load directly to target device if possible
         logging.info(f"Successfully loaded checkpoint from {checkpoint_path}")
     except Exception as e:
         logging.error(f"Failed to load checkpoint from {checkpoint_path}: {e}")
 
     return checkpoint_data
+
 
 def plot_roc_curves(
     left_out_ind_stats: Dict,
@@ -156,7 +164,7 @@ def plot_roc_curves(
     # Add text box with summary statistics
     valid_aurocs = {k: v for k, v in aurocs.items() if not np.isnan(v)}
     if valid_aurocs:
-        best_method = max(valid_aurocs, key=valid_aurocs.get)
+        best_method = max(valid_aurocs, key=lambda k: valid_aurocs[k])
         textstr = f'Best Method: {best_method.upper()}\nAUROC: {valid_aurocs[best_method]:.3f}'
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
         plt.text(0.02, 0.98, textstr, transform=plt.gca().transAxes, fontsize=10,
