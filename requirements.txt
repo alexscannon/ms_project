@@ -30,6 +30,8 @@ tqdm>=4.61.0
 # Utilities
 jsonschema>=3.2.0
 requests>=2.25.0
+colorama >= 0.4.6
+einops >= 0.8.1
 # typing-extensions>=3.10.0
 # setuptools >= 75.9.1
 

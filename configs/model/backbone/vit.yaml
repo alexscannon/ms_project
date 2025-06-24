@@ -1,0 +1,12 @@
+name: vit
+dim: 192
+mlp_dim_ratio: 2
+depth: 9
+heads: 12
+stochastic_depth: 0.1 # rate of stochastic depth
+is_SPT: False # Shifted Patch Tokenization
+is_LSA: False # Locality Self-Attention
+
+# Location of the best performing run
+cifar100_location: '/home/alex/repos/SPT_LSA_ViT/save/vit-Base--CIFAR100-LR[0.007]-Seed0/best.pth'
+tiny_imagenet_location: '/home/alex/repos/SPT_LSA_ViT/save/vit-Base--T-IMNET-LR[0.007]-Seed0/best.pth'

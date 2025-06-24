@@ -1,13 +1,15 @@
 name: cifar100
+location: /home/alex/data/
+
 channels: 3
 image_size: 32
 num_classes: 100 # Total number of classes
-num_ind_classes: 80 # Number of in-distribution classes
-num_ood_classes: 20 # Number of out-of-distribution classes
 mean: [0.5071, 0.4867, 0.4408]
 std: [0.2675, 0.2565, 0.2761]
+
+num_ind_classes: 80 # Number of in-distribution classes
+num_ood_classes: 20 # Number of out-of-distribution classes
+
 batch_size: 32
 num_workers: 4
 pin_memory: true
-
-location: /content/drive/MyDrive/data/cifar100/

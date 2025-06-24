@@ -1,5 +1,7 @@
 .env
 .DS_store
 data/
+outputs/
+.vscode
 
 **/__pycache__/

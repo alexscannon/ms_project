@@ -1,21 +1,24 @@
 name: tiny_imagenet
-location: /content/drive/MyDrive/data/tinyimagenet/ # Root directory for the Tiny ImageNet dataset
 
-# --- Dataset Characteristics ---
+# Location of all data. Organized by purpose
+train_location: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/train
+train_ind_in_location: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/train_ind_in
+train_ind_out_location: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/train_ind_out
+train_ood_location: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/train_ood
+
+val_location: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/val
+val_organized_location: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/val_organized
+val_ind: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/val_ind
+val_ood: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/val_ood
+
+test_location: /home/alex/data/tiny-imagenet-200/tiny-imagenet-200/test
+
+# --- Dataset Characteristics --- #
 num_classes: 200  # Tiny ImageNet has 200 classes
 num_ind_classes: 160 # Number of in-distribution classes
 num_ood_classes: 40 # Number of out-of-distribution classes
 image_size: 64    # Original image size (height and width) for Tiny ImageNet
 channels: 3       # Number of image channels (e.g., 3 for RGB)
-
-# --- Data Structure (paths relative to 'location') ---
-# These define where the train, validation, and (optionally) test sets are.
-# Adjust them if your Tiny ImageNet directory structure is different.
-train_folder: train                     # Subfolder for training images
-val_folder: val                         # Subfolder for validation images
-# Tiny ImageNet's validation set often requires an annotations file to map images to their correct class folders/labels.
-val_annotations_file: val/val_annotations.txt
-# test_folder: test                     # Subfolder for test images (often unlabeled, if present)
 
 # --- Data Preprocessing Parameters --- #
 mean: [0.485, 0.456, 0.406] # Example: ImageNet mean for normalization

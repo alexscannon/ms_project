@@ -11,13 +11,15 @@ from tqdm import tqdm
 from src.models.ood.energy import EnergyDetector
 from src.models.ood.knn import KNNDetector
 from src.utils import plot_roc_curves
+from torch import device as TorchDevice
+from torch.utils.data import DataLoader
 
 class OODDetector:
     """
     OOD detector class supporting multiple OOD detection methods.
     """
 
-    def __init__(self, config: DictConfig, model: torch.nn.Module, device: str = 'cuda', temperature: float = 1.0):
+    def __init__(self, config: DictConfig, model: torch.nn.Module, device: TorchDevice = torch.device('cuda'), temperature: float = 1.0):
         self.config = config
         self.model = model
         self.device = device
@@ -36,26 +38,26 @@ class OODDetector:
         }
 
 
-    def run_ood_detection(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader, pretrained_ind_dataloader: torch.utils.data.DataLoader) -> dict:
+    def run_ood_detection(self, left_in_ind_dataloader: DataLoader, left_out_ind_dataloader: DataLoader, ood_dataloader: DataLoader) -> dict:
         """
         Run OOD detection on the remaining in-distribution and out-of-distribution dataloaders.
         Args:
-            left_out_ind_dataset (torch.utils.data.Dataset): In-distribution dataset
-            ood_dataset (torch.utils.data.Dataset): Out-of-distribution dataset
-            pretrained_ind_dataset (torch.utils.data.Dataset): Pretrained in-distribution dataset
+            left_in_ind_dataloader (torch.utils.data.Dataset): In-distribution dataset that the model was trained on
+            left_out_ind_dataloader (torch.utils.data.Dataset): In-distribution dataset that the model has never seen
+            ood_dataloader (torch.utils.data.Dataset): Out-of-distribution dataset
         Returns:
             dict: Dictionary containing the OOD detection scores and labels
         """
         # Fit the Mahalanobis detector
         self.detectors["mahalanobis"].fit(
-            pretrained_ind_dataloader,
+            left_in_ind_dataloader,
             self.extract_features_and_logits,
             self.config.data.num_ind_classes
         )
 
         # Fit the KNN detector
         self.detectors["knn"].fit(
-            pretrained_ind_dataloader,
+            left_in_ind_dataloader,
             self.extract_features_and_logits,
             self.config.data.num_ind_classes
         )
@@ -67,7 +69,7 @@ class OODDetector:
         plot_roc_curves(left_out_ind_stats, ood_stats, detector_names=list(aurocs.keys()))
         return aurocs
 
-    def compute_all_ood_stats(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
+    def compute_all_ood_stats(self, left_out_ind_dataloader: DataLoader, ood_dataloader: DataLoader) -> Tuple[dict, dict]:
         """
         Compute all OOD detection scores for the left-out in-distribution and out-of-distribution datasets.
         """
@@ -113,7 +115,7 @@ class OODDetector:
         }
 
 
-    def compute_data_ood_stats(self, dataloader: torch.utils.data.DataLoader) -> dict:
+    def compute_data_ood_stats(self, dataloader: DataLoader) -> dict:
         """
         Compute all scores for the OOD detection methods.
 
@@ -314,7 +316,7 @@ class OODDetector:
         except ValueError as e:
             logging.error(f"AUROC calculation failed for {detector_name}: {e}. Scores: {all_scores[:10]}, Labels: {all_labels[:10]}")
             auroc = np.nan # Return NaN if calculation fails (e.g. only one class present in y_true)
-        return auroc
+        return float(auroc)
 
     # def get_ood_scores(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
     #     """
