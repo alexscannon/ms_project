@@ -1,0 +1,7 @@
+project_name: 'MS Project'
+experiment_name: "continual_learning_experiment"
+entity: 'acannon37'
+api_key: ${oc.env:WANDB_API_KEY}
+tags: None
+log_model: False
+save_code: False

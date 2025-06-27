@@ -5,6 +5,8 @@ defaults:
   - model: model
   - data: tiny_imagenet # options: cifar100, tiny_imagenet
   - ood: ood
+  - cl: continual_learning
+  - logging: wandb # options: wandb, tensorboard, none
 
 # General
 seed: 42 # random seed for reproducability
