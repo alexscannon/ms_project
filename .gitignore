@@ -4,5 +4,6 @@ data/
 outputs/
 .vscode
 wandb/
+outputs/
 
 **/__pycache__/
