@@ -1,6 +1,7 @@
 import torch
 from omegaconf import DictConfig
 import torch.nn.functional as F
+import logging
 
 class MSP:
     """
@@ -12,18 +13,45 @@ class MSP:
     def __init__(self, model: torch.nn.Module, ood_config: DictConfig):
         self.model = model
         self.ood_config = ood_config
+        self.is_fitted = False
+
+    def fit(self, dataloader: torch.utils.data.DataLoader, extract_fn, *args):
+        """
+        Calibrate the threshold on in-distribution data.
+        Sets the threshold to the q-th percentile of MSP scores on the provided data.
+        """
+        logging.info("Calibrating MSP threshold...")
+        all_msp_scores = []
+        for batch in dataloader:
+            x, _ = batch
+            x = x.to(next(self.model.parameters()).device)
+            with torch.no_grad():
+                _, logits = extract_fn(x, self.model)
+            msp_scores = self.get_msp_scores(logits)
+            all_msp_scores.append(msp_scores.cpu())
+
+        all_msp_scores = torch.cat(all_msp_scores)
+
+        # A common approach is to set the threshold to correctly classify 95% of ID data.
+        # Since lower scores indicate OOD, the threshold is the 5th percentile.
+        q = 1.0 - self.ood_config.msp.get("id_confidence_percentile", 0.95)
+        self.threshold = torch.quantile(all_msp_scores, q).item()
+        self.is_fitted = True
+        logging.info(f"MSP threshold calibrated to: {self.threshold:.4f}")
+
 
     def predict_ood_msp(self, logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Return a boolean decision if the examples are OOD or not.
+
         Args:
-            logits (torch.Tensor): Logits of shape (B, C)
+            logits (torch.Tensor): Logits of shape (B, C).
         Returns:
-            is_ood (torch.Tensor): Boolean tensor of shape (B,)
-            msp_scores (torch.Tensor): MSP scores of shape (B,)
+            is_ood (torch.Tensor): Boolean tensor of shape (B,).
+            msp_scores (torch.Tensor): MSP scores of shape (B,).
         """
         msp_scores = self.get_msp_scores(logits)
-        is_ood = msp_scores > self.ood_config.msp.threshold
+        is_ood = msp_scores < self.threshold
         return msp_scores, is_ood
 
     def get_msp_scores(self, logits: torch.Tensor) -> torch.Tensor:

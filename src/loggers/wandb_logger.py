@@ -1,11 +1,12 @@
+from typing import Any
 import wandb
 import logging
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 
 logger = logging.getLogger(__name__)
 
-class WandbLogger:
+class WandBLogger:
     """
     Weights & Biases logger for continual learning experiments.
 
@@ -32,9 +33,9 @@ class WandbLogger:
                 project=config.logging.project_name,
                 name=config.logging.experiment_name,
                 entity=config.logging.entity,
-                config=config.logging.config,
                 tags=config.logging.tags,
-                reinit=True,  # Allow for multiple runs in the same process
+                config=OmegaConf.to_container(config, resolve=True),  # Log the entire config # type: ignore
+                reinit='finish_previous',
                 settings=wandb.Settings(code_dir=".") if config.logging.save_code else None,
                 job_type="inference"
             )
@@ -45,6 +46,21 @@ class WandbLogger:
         except Exception as e:
             logger.error(f"Failed to initialize W&B: {str(e)}")
             self.run = None
+
+    def log(self, data: dict[str, Any], step: int | None = None, commit: bool | None = None) -> None:
+        """
+        Log data to the W&B run.
+        Args:
+            data (dict): Data to log.
+            step (int, optional): Step number for the logged data.
+            commit (bool, optional): Whether to commit the logged data immediately.
+        Returns:
+            None
+        """
+        if self.run:
+            self.run.log(data=data, step=step, commit=commit)
+        else:
+            logger.warning("No W&B run to log data to. Please initialize the run first.")
 
     def finish(self, exit_code: int = 0) -> None:
         """

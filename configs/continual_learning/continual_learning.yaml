@@ -1,0 +1,7 @@
+
+cifar100C_location: "/home/alex/data/CIFAR-100-C" # Location of CIFAR-100-C dataset
+tinyimagenetC_location: "/home/alex/data/Tiny-ImageNet-C" # Location of Tiny-ImageNet-C dataset
+batch_size: 1 # Batch size of 1 is meant for a streaming setting
+warmup_metric_period: 100 # number of examples to wait before computing the metric
+
+ood_method: "knn"

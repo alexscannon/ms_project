@@ -195,8 +195,22 @@ class ViT(nn.Module):
             nn.LayerNorm(self.dim),
             nn.Linear(self.dim, self.num_classes)
         )
-
         self.apply(init_weights)
+
+    def forward_features(self, x: torch.Tensor) -> torch.Tensor:
+        # patch embedding
+        x = self.to_patch_embedding(x)
+
+        b, n, _ = x.shape
+
+        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)
+        x = torch.cat((cls_tokens, x), dim=1)
+        x += self.pos_embedding[:, :(n + 1)]
+        x = self.dropout(x)
+
+        x = self.transformer(x)
+
+        return x[:, 0]
 
     def forward(self, img):
         # patch embedding
@@ -220,8 +234,8 @@ class ViT(nn.Module):
 
 
 
-#  ========= OLD ViT Class
-class VisionTransformer(nn.Module):
+#  ========= OLD ViT Class (not used) =========
+class TimmVisionTransformer(nn.Module):
     def __init__(self, config: DictConfig, checkpoint_data: Dict):
         super().__init__()
 

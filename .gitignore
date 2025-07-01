@@ -3,5 +3,6 @@
 data/
 outputs/
 .vscode
+wandb/
 
 **/__pycache__/

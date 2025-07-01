@@ -1,6 +1,6 @@
 project_name: 'MS Project'
-experiment_name: "continual_learning_experiment"
-entity: 'acannon37'
+experiment_name: 'continual_learning_experiment'
+entity: 'acannon37-georgia-institute-of-technology'
 api_key: ${oc.env:WANDB_API_KEY}
 tags: None
 log_model: False

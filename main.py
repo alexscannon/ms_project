@@ -8,7 +8,7 @@ from src.data.dataset_loader import dataload
 from src.utils import get_checkpoint_dict
 from src.models.ood.ood_detector import OODDetector
 from src.models.continual_learning.CL import ContinualLearning
-from src.loggers.wandb_logger import WandbLogger
+from src.loggers.wandb_logger import WandBLogger
 from src.utils import set_seed
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
@@ -29,7 +29,7 @@ def main(config: DictConfig):
     logging.info(f"Using device: {device} ...")
 
     # Initialize logging
-    wand_logger = WandbLogger(config)
+    wand_logger = WandBLogger(config)
 
 
     # ============================ Load pre-trained model ============================ #
@@ -37,11 +37,11 @@ def main(config: DictConfig):
     checkpoint_data = get_checkpoint_dict(config.data.name, config, device)
 
     logging.info(f"checkpoint_data attributes: {checkpoint_data.keys()}")
-    if config.data.name != 'tiny_imagenet':
-        logging.info(f"checkpoint_data['class_info'] attributes: {list(checkpoint_data['class_info'].keys())}")
+    logging.info(f"checkpoint_data['class_info'] attributes: {list(checkpoint_data['class_info'].keys())}")
 
-    # Create bare ViT model and load model weights
+    # Create new non-pretrained ViT model
     model = create_model(config.data.image_size, int(config.data.num_classes * config.ind_class_ratio), config)
+    # load model weights if pretrained in some way
     if config.model.pretrained:
         model.load_state_dict(checkpoint_data["model_state_dict"])
 
@@ -53,19 +53,27 @@ def main(config: DictConfig):
     # ============================ OOD detection ============================ #
     # Create OOD detector
     logging.info("Creating OOD detector...")
-    ood_detector = OODDetector(config, model, device)
+    ood_detector = OODDetector(config, model, left_in_ind_dataloader, device)
 
     # Run OOD detection
-    logging.info("Running OOD detection...")
-    aurocs = ood_detector.run_ood_detection(left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader)
-    formatted_aurocs = {k: f"{v * 100:.2f}%" for k, v in aurocs.items()}
-    logging.info(f"AUROCs: {formatted_aurocs}")
+    # logging.info("Running OOD detection...")
+    # aurocs = ood_detector.run_ood_detection(left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader)
+    # formatted_aurocs = {k: f"{v * 100:.2f}%" for k, v in aurocs.items()}
+    # logging.info(f"AUROCs: {formatted_aurocs}")
 
     # ============================ Continual Learning ============================ #
     logging.info("Running Continual Learning scenario...")
     continual_learning = ContinualLearning(config, model, device)
     # Stage 1: Handle the remaining in-distribution data in a continual learning setting
-    continual_learning.run_covariate_continual_learning(left_in_ind_dataloader, ood_dataloader)
+    continual_learning.run_covariate_continual_learning(
+        left_out_ind_dataloader=left_in_ind_dataloader,
+        ood_dataloader=ood_dataloader,
+        wandb_logger=wand_logger,
+        ood_detector=ood_detector,
+        config=config,
+        model=model,
+        checkpoint_class_info=checkpoint_data["class_info"]
+    )
 
     wand_logger.finish(exit_code=0)
 

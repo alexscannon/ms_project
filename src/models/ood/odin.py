@@ -33,17 +33,17 @@ class ODINDetector:
 
         self.model.eval() # Set model to evaluation mode
 
-    def predict_ood_odin(self, dataloader: torch.utils.data.DataLoader) -> tuple[torch.Tensor, torch.Tensor]:
+    def predict_ood_odin(self, logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Computes the OODIN score for the input tensor and a boolean decision if the input is OOD or not.
 
         Args:
-            dataloader (torch.utils.data.DataLoader): Input dataloader
+            logits (torch.Tensor): predicted logits from the model
         Returns:
-            score (torch.Tensor): OODIN score of shape (B,)
+            odin_score (torch.Tensor): OODIN score of shape (B,)
             is_ood (torch.Tensor): Boolean tensor of shape (B,)
         """
-        odin_score = self.get_odin_scores(dataloader)
+        odin_score = self.get_odin_scores(logits)
         is_ood = odin_score < self.threshold
         return odin_score, is_ood
 

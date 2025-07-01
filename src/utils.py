@@ -1,12 +1,40 @@
 import os
-from typing import Dict, List, Optional, Tuple
-from omegaconf import DictConfig
-import torch
+import random
 import logging
-from torch import device as TorchDevice
+import torch
 import numpy as np
+
+from typing import Dict, List, Optional, Tuple
+from torch import device as TorchDevice
+from torch import version
 from matplotlib import pyplot as plt
+from omegaconf import DictConfig
 from sklearn.metrics import roc_curve, auc
+
+def set_seed(seed: int = 42) -> None:
+    """
+    Sets the random seeds for reproducibility.
+    Args:
+        seed (int): The seed value to set.
+    Returns:
+        None
+    """
+
+    random.seed(seed) # Set Python random seed
+    np.random.seed(seed)  # Set NumPy random seed
+    os.environ["PYTHONHASHSEED"] = str(seed) # Set a fixed value for the hash seed, seeds for data loading operations
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed) # set torch (GPU) seed
+        torch.cuda.manual_seed_all(seed)  # For multi-GPU setups
+        torch.backends.cudnn.deterministic = True # set cudnn to deterministic mode
+        torch.backends.cudnn.benchmark = False  # Disable benchmarking for reproducibility
+
+    # Document the environment for future reproducibility
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"CUDA version: {version.cuda if torch.cuda.is_available() else 'N/A'}")
+
+    logging.info(f"Random seed set to {seed} for reproducibility.")
 
 
 def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: TorchDevice) -> dict:
@@ -241,4 +269,4 @@ def plot_single_roc_curve(
     if show_plot:
         plt.show()
 
-    return roc_auc
+    return float(roc_auc)

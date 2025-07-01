@@ -3,17 +3,33 @@ import torch.nn.functional as F
 
 
 class EnergyDetector:
-    def __init__(self, model, config):
+    def __init__(self, model, ood_config):
         """
         Energy detector class.
         Paper: https://arxiv.org/pdf/2010.03759
         Args:
             model (torch.nn.Module): The model to use for energy detection.
-            config (DictConfig): The configuration for the energy detector.
+            ood_config (DictConfig): The configuration for the energy detector.
         """
         self.model = model
-        self.config = config
-        self.temperature = getattr(config, 'temperature', 1.0)
+        self.ood_config = ood_config
+        self.temperature = getattr(ood_config.energy, 'temperature', 1.0)
+
+    def predict_ood_energy(self, logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Computes the energy score for the input logits and a boolean decision if the input is OOD or not.
+
+        Args:
+            logits (torch.Tensor): Model logits with shape [batch_size, num_classes]
+
+        Returns:
+            tuple: (energy_scores, is_ood)
+                energy_scores (torch.Tensor): Energy scores of shape [batch_size]
+                is_ood (torch.Tensor): Boolean tensor indicating if each example is OOD
+        """
+        energy_scores = self.get_energy_scores(logits)
+        is_ood = energy_scores < getattr(self.ood_config.energy, "threshold", 0.0)  # OOD if energy score is negative
+        return energy_scores, is_ood
 
     def get_energy_scores(self, logits: torch.Tensor) -> torch.Tensor:
         """

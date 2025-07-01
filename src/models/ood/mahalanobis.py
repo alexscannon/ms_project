@@ -62,7 +62,7 @@ class MahalanobisDetector:
                     x = batch.to(self.device)
                     y = None
 
-                features, _ = feature_extractor_fn(x) # Returns (features, logits)
+                features, _ = feature_extractor_fn(x, self.model) # Returns (features, logits)
                 # Store the first batch of features to determine the dimensionality of the features if any class happens to have no samples.
                 if first_batch_features is None:
                     first_batch_features = features

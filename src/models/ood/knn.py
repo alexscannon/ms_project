@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import logging
+from typing import Tuple
 
 
 class KNNDetector:
@@ -22,6 +23,7 @@ class KNNDetector:
         self.config = config
         self.k = config.knn.k
         self.metric = config.knn.metric
+        self.threshold = config.knn.threshold if hasattr(config.knn, 'threshold') else 0.0
 
         self.knn_index = None
         self.is_fitted = False
@@ -51,7 +53,7 @@ class KNNDetector:
                 x = x.to(device)
 
                 # Extract features using the provided function
-                features, _ = feature_extractor_fn(x)
+                features, _ = feature_extractor_fn(x, self.model)
 
                 # Move to CPU and convert to numpy for sklearn
                 if isinstance(features, torch.Tensor):
@@ -93,7 +95,7 @@ class KNNDetector:
 
         # Convert to numpy if needed
         if isinstance(features, torch.Tensor):
-            features_np = features.cpu().numpy()
+            features_np = features.cpu().detach().numpy()
             return_tensor = True
         else:
             features_np = features
@@ -110,7 +112,22 @@ class KNNDetector:
         # This makes it consistent with other detectors where higher score = more ID
         scores = -kth_distances
 
-        if return_tensor:
-            return torch.tensor(scores, dtype=torch.float32)
-        else:
-            return scores
+        # Always return a torch.Tensor to match the return type annotation
+        return torch.tensor(scores, dtype=torch.float32)
+
+
+    def predict_ood_knn(self, features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Predicts OOD status based on Mahalanobis scores.
+
+        Args:
+            features (torch.Tensor): Input features of shape (B, D).
+
+        Returns:
+            mahalanobis_scores (torch.Tensor): The computed scores or negative distances.
+            is_ood (torch.Tensor): Boolean tensor indicating OOD status, True if OOD.
+        """
+        knn_scores = self.get_knn_scores(features)
+        # Higher score (less negative/more positive) means more in-distribution.
+        is_ood = knn_scores < self.threshold
+        return knn_scores, is_ood

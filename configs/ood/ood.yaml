@@ -3,9 +3,11 @@ threshold: 0.5 # Threshold for OOD detection
 
 energy:
   temperature: 1.0 # parameter-free by simply setting T = 1
+  threshold: 0.0 # Threshold for OOD detection
 msp:
   temperature: 1.0
   threshold: 0.5
+  id_confidence_percentile": 0.95 # Percentile for ID confidence
 odin:
   temperature: 1000.0 # Temperature scaling parameter
   epsilon: 0.002 # Magnitude of input preprocessing (Value from paper for CIFAR-100)

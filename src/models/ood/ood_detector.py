@@ -13,17 +13,19 @@ from src.models.ood.knn import KNNDetector
 from src.utils import plot_roc_curves
 from torch import device as TorchDevice
 from torch.utils.data import DataLoader
+from src.models.utils import extract_features_and_logits
 
 class OODDetector:
     """
     OOD detector class supporting multiple OOD detection methods.
     """
 
-    def __init__(self, config: DictConfig, model: torch.nn.Module, device: TorchDevice = torch.device('cuda'), temperature: float = 1.0):
+    def __init__(self, config: DictConfig, model: torch.nn.Module, left_in_ind_dataloader: DataLoader, device: TorchDevice = torch.device('cuda'), temperature: float = 1.0):
         self.config = config
         self.model = model
         self.device = device
         self.temperature = temperature # Temperature for the softmax function
+        self.left_in_ind_dataloader = left_in_ind_dataloader
 
         self.model.to(self.device) # Move model to device
         self.model.eval() # Set model to evaluation mode
@@ -37,6 +39,17 @@ class OODDetector:
             "knn": KNNDetector(self.model, self.config.ood),
         }
 
+        fit_methods = ["mahalanobis", "knn", "msp"]
+        for method in fit_methods:
+            if method in self.detectors:
+                self.detectors[method].fit(
+                    self.left_in_ind_dataloader,
+                    extract_features_and_logits,
+                    self.config.data.num_ind_classes
+                )
+            else:
+                logging.warning(f"Detector {method} is not available in the configuration. Skipping fitting for this detector.")
+
 
     def run_ood_detection(self, left_in_ind_dataloader: DataLoader, left_out_ind_dataloader: DataLoader, ood_dataloader: DataLoader) -> dict:
         """
@@ -46,49 +59,65 @@ class OODDetector:
             left_out_ind_dataloader (torch.utils.data.Dataset): In-distribution dataset that the model has never seen
             ood_dataloader (torch.utils.data.Dataset): Out-of-distribution dataset
         Returns:
-            dict: Dictionary containing the OOD detection scores and labels
+            aurocs (dict): Dictionary containing the OOD detection scores and labels
         """
-        # Fit the Mahalanobis detector
-        self.detectors["mahalanobis"].fit(
-            left_in_ind_dataloader,
-            self.extract_features_and_logits,
-            self.config.data.num_ind_classes
-        )
 
-        # Fit the KNN detector
-        self.detectors["knn"].fit(
-            left_in_ind_dataloader,
-            self.extract_features_and_logits,
-            self.config.data.num_ind_classes
-        )
-
-        left_out_ind_stats, ood_stats = self.compute_all_ood_stats(left_out_ind_dataloader, ood_dataloader)
         # Plot ROC curves
-        aurocs: dict = self.calculate_all_aurocs(left_out_ind_stats, ood_stats)
+        aurocs, left_out_ind_stats, ood_stats = self.calculate_all_aurocs(left_out_ind_dataloader, ood_dataloader)
         logging.info(f"Plotting ROC curves...")
         plot_roc_curves(left_out_ind_stats, ood_stats, detector_names=list(aurocs.keys()))
         return aurocs
 
-    def compute_all_ood_stats(self, left_out_ind_dataloader: DataLoader, ood_dataloader: DataLoader) -> Tuple[dict, dict]:
+    def determine_ood_or_ind(self, logits: torch.Tensor, ood_method: str, features: torch.Tensor) -> bool:
         """
-        Compute all OOD detection scores for the left-out in-distribution and out-of-distribution datasets.
+        Given a valid ood methodology, determines if the current example is OOD (out-of-distribution) or IND (in-distribution).
+
+        Args:
+            logits (torch.Tensor): The model logits for the input example.
+            ood_method (str): The OOD detection method to use. Options include "msp", "odin", "mahalanobis", "energy", "knn".
+            features (torch.Tensor): The features extracted from the input example, used for some OOD methods.
+        Returns:
+            is_ood (bool): True if the example is OOD, False if it is IND.
         """
-        logging.info("Computing OOD detection scores for left-out in-distribution dataset...")
-        left_out_ind_stats: dict = self.compute_data_ood_stats(left_out_ind_dataloader)
-        logging.info("Computing OOD detection scores for out-of-distribution dataset...")
-        ood_stats: dict = self.compute_data_ood_stats(ood_dataloader)
-        return left_out_ind_stats, ood_stats
+
+        if ood_method == "msp":
+            msp_scores, is_ood = self.detectors["msp"].predict_ood_msp(logits)
+
+        elif ood_method == "odin":
+            odin_score, is_ood = self.detectors["odin"].predict_ood_odin(logits)
+
+        elif ood_method == "mahalanobis":
+            mahalanobis_scores, is_ood = self.detectors["mahalanobis"].predict_ood_mahalanobis(features)
+
+        elif ood_method == "energy":
+            energy_scores, is_ood = self.detectors["energy"].predict_ood_energy(logits)
+
+        elif ood_method == "knn":
+            knn_scores, is_ood = self.detectors["knn"].predict_ood_knn(features)
+
+        else:
+            raise ValueError(f"Unknown OOD detector: {ood_method}")
+
+        return is_ood
+
+    # def calculate_single_auroc(self, ood_method: str = 'msp'):
+    #     ind_stats, ood_stats = compute_all_ood_stats()
 
 
-    def calculate_all_aurocs(self, left_out_ind_stats: dict, ood_stats: dict) -> dict:
+    def calculate_all_aurocs(self, left_out_ind_dataloader: DataLoader, ood_dataloader: DataLoader) -> Tuple[dict, dict, dict]:
         """
         Calculate all AUROCs for the OOD detection methods.
         Args:
-            left_out_ind_stats (dict): Dictionary containing the OOD detection scores and other relevant statistics for the left-out in-distribution dataset
-            ood_stats (dict): Dictionary containing the OOD detection scores and other relevant statistics for the out-of-distribution dataset
+            left_out_ind_dataloader (torch.utils.data.DataLoader): Dataloader for the left-out in-distribution dataset
+            ood_dataloader (torch.utils.data.DataLoader): Dataloader for the out-of-distribution dataset
         Returns:
-            dict: Dictionary containing the AUROCs for the OOD detection methods
+            aurocs (dict): Dictionary containing the AUROCs for the OOD detection methods
+            left_out_ind_stats (dict): Dictionary containing the OOD detection scores and labels for the left-out in-distribution dataset
+            ood_stats (dict): Dictionary containing the OOD detection scores and labels for the out
         """
+
+        left_out_ind_stats, ood_stats = self.compute_all_ood_stats(left_out_ind_dataloader, ood_dataloader)
+
         auroc_msp = None
         auroc_odin = None
         auroc_mahalanobis = None
@@ -106,7 +135,7 @@ class OODDetector:
         if "knn" in self.detectors:
             auroc_knn = self.evaluate_with_auroc(left_out_ind_stats, ood_stats, "knn")
 
-        return {
+        aurocs = {
             "msp": auroc_msp,
             "odin": auroc_odin,
             "mahalanobis": auroc_mahalanobis,
@@ -114,15 +143,33 @@ class OODDetector:
             "knn": auroc_knn
         }
 
+        return aurocs, left_out_ind_stats, ood_stats
+
+
+    def compute_all_ood_stats(self, left_out_ind_dataloader: DataLoader, ood_dataloader: DataLoader) -> Tuple[dict, dict]:
+        """
+        Compute all OOD detection scores for the left-out in-distribution and out-of-distribution datasets.
+        Args:
+            left_out_ind_dataloader (torch.utils.data.DataLoader): Dataloader for the left-out in-distribution dataset
+            ood_dataloader (torch.utils.data.DataLoader): Dataloader for the out-of-distribution dataset
+        Returns:
+            Tuple[dict, dict]: Tuple containing two dictionaries with OOD detection scores and labels for the left-out in-distribution and out-of-distribution datasets
+        """
+        logging.info("Computing OOD detection scores for left-out in-distribution dataset...")
+        left_out_ind_stats: dict = self.compute_data_ood_stats(left_out_ind_dataloader)
+
+        logging.info("Computing OOD detection scores for out-of-distribution dataset...")
+        ood_stats: dict = self.compute_data_ood_stats(ood_dataloader)
+
+        return left_out_ind_stats, ood_stats
 
     def compute_data_ood_stats(self, dataloader: DataLoader) -> dict:
         """
         Compute all scores for the OOD detection methods.
-
         Args:
             dataloader (torch.utils.data.DataLoader): Input dataloader
         Returns:
-            dict: Dictionary containing the OOD detection scores and labels
+            results (dict): Dictionary containing the OOD detection scores and labels
         """
         batch_cache = {
             "batch_data_info": {
@@ -154,7 +201,7 @@ class OODDetector:
 
             # Compute logits and features
             with torch.no_grad():
-                logits, features = self.extract_features_and_logits(x)
+                features, logits = extract_features_and_logits(x, self.model)
                 batch_cache["batch_data_info"]["logits"].append(logits)
                 batch_cache["batch_data_info"]["features"].append(features)
 
@@ -178,6 +225,7 @@ class OODDetector:
             if "mahalanobis" in self.detectors:
                 mahalanobis_detector = self.detectors["mahalanobis"]
                 if mahalanobis_detector.is_fitted:
+                    # Use 'features' instead of 'logits' below:
                     mahalanobis_scores = mahalanobis_detector.get_mahalanobis_scores(features)
                     batch_cache["detector_scores"]["mahalanobis_scores"].append(mahalanobis_scores)
                 elif not hasattr(mahalanobis_detector, "_warned_not_fitted"): # Log warning only once
@@ -237,30 +285,6 @@ class OODDetector:
         return results
 
 
-    def extract_features_and_logits(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Extract features and logits from the model.
-
-        Args:
-            x (torch.Tensor): Input tensor
-        Returns:
-            features (torch.Tensor): Features from the model
-            logits (torch.Tensor): Logits from the model
-        """
-        self.model.eval() # Set model to evaluation mode
-        logits = self.model(x)
-        # For ViT, we can extract features from the last layer before classification
-        # This assumes the model has a 'head' attribute for the classification layer
-        if hasattr(self.model, 'head'):
-            features = self.model.forward_features(x)
-            if hasattr(features, 'shape') and len(features.shape) > 2:
-                features = features.mean(dim=1)  # Global average pooling if needed
-        else:
-            # Fallback: use logits as features
-            features = logits
-
-        return features, logits
-
     def evaluate_with_auroc(self, left_out_ind_stats: dict, ood_stats: dict, detector_name: str) -> float:
         """
         Evaluate using AUROC (threshold-independent)
@@ -291,16 +315,13 @@ class OODDetector:
         ood_scores = ood_scores_tensor.cpu().numpy()
 
         all_scores = np.concatenate([ind_scores, ood_scores])
-        logging.info(f"Shape of all scores: {all_scores.shape}")
 
         # Create labels: 0 for in-distribution, 1 for out-of-distribution
         # Note: The original code used labels from the data, which might be class labels.
         # For OOD AUROC, we need binary labels indicating ID vs OOD.
-        # Let's assume left_out_ind_stats are ID (label 0) and ood_stats are OOD (label 1).
         labels_ind = np.zeros(len(ind_scores), dtype=int)
         labels_ood = np.ones(len(ood_scores), dtype=int)
         all_labels = np.concatenate([labels_ind, labels_ood])
-        logging.info(f"Shape of all labels: {all_labels.shape}")
 
         # For AUROC calculation, roc_auc_score expects higher scores for the positive class (OOD).
         # Our OOD scores are designed such that:
@@ -318,74 +339,6 @@ class OODDetector:
             auroc = np.nan # Return NaN if calculation fails (e.g. only one class present in y_true)
         return float(auroc)
 
-    # def get_ood_scores(self, left_out_ind_dataloader: torch.utils.data.DataLoader, ood_dataloader: torch.utils.data.DataLoader) -> dict:
-    #     """
-    #     Get OOD scores from the input tensor.
-    #     Args:
-    #         left_out_ind_dataloader (torch.utils.data.DataLoader): In-distribution dataset
-    #         ood_dataloader (torch.utils.data.DataLoader): Out-of-distribution dataset
-    #     Returns:
-    #         dict: Dictionary containing the OOD detection scores and labels
-    #     """
-    #     # x_ind, y_ind = self._ensure_batch_format(left_out_ind_dataloader)
-    #     # x_ood, y_ood = self._ensure_batch_format(ood_dataloader)
-
-    #     # Extract features and logits
-    #     features_ind, logits_ind = self.extract_features_and_logits(left_out_ind_dataloader)
-    #     features_ood, logits_ood = self.extract_features_and_logits(ood_dataloader)
-
-    #     # ================ MSP ================ #
-    #     msp = MSP(self.model, self.config.ood)
-    #     msp_scores_ind, is_ood_msp_ind = msp.predict_ood_msp(logits_ind)
-    #     msp_scores_ood, is_ood_msp_ood = msp.predict_ood_msp(logits_ood)
-
-    #     # ================ ODIN ================ #
-    #     odin = ODINDetector(self.model, self.config.ood)
-    #     odin_scores_ind, is_ood_odin_ind = odin.predict_ood_odin(left_out_ind_dataloader)
-    #     odin_scores_ood, is_ood_odin_ood = odin.predict_ood_odin(ood_dataloader)
-
-    #     return {
-    #         "msp": {
-    #             "scores_ind": msp_scores_ind,
-    #             "is_ood_ind": is_ood_msp_ind,
-    #             "scores_ood": msp_scores_ood,
-    #             "is_ood_ood": is_ood_msp_ood
-    #         },
-    #         "odin": {
-    #             "scores_ind": odin_scores_ind,
-    #             "is_ood_ind": is_ood_odin_ind,
-    #             "scores_ood": odin_scores_ood,
-    #             "is_ood_ood": is_ood_odin_ood
-    #         }
-    #     }
-
-
-    # def _ensure_batch_format(self, input: torch.utils.data.DataLoader) -> Tuple[torch.Tensor, torch.Tensor]:
-    #     """
-    #     Ensure inputs have batch dimension.
-
-    #     Args:
-    #         input (torch.utils.data.DataLoader): Input dataloader
-
-    #     Returns:
-    #         x (torch.Tensor): Shape [B, C, H, W]
-    #         y (torch.Tensor): Shape [B] or None
-    #     """
-    #     # Add batch dimension if needed
-    #     logging.info(f"Input type: {type(input)}")
-    #     logging.info(f"Input dataset: {input.dataset}")
-    #     x, y = input.dataset
-    #     if x.ndim == 3:
-    #         x = x.unsqueeze(0)
-
-    #     # Handle labels
-    #     if y is not None:
-    #         if isinstance(y, int):
-    #             y = torch.tensor([y], device=x.device)
-    #         elif y.ndim == 0:  # scalar tensor
-    #             y = y.unsqueeze(0)
-
-    #     return x, y # Return tuple of (x, y)
 
 
 
