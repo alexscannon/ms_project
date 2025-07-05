@@ -1,5 +1,5 @@
 project_name: 'MS Project'
-experiment_name: 'continual_learning_experiment'
+experiment_name: 'cl_${data.name}_${continual_learning.ood_method}'
 entity: 'acannon37-georgia-institute-of-technology'
 api_key: ${oc.env:WANDB_API_KEY}
 tags: None

@@ -2,6 +2,7 @@ import torch
 from omegaconf import DictConfig
 import torch.nn.functional as F
 import logging
+from tqdm import tqdm
 
 class MSP:
     """
@@ -22,7 +23,8 @@ class MSP:
         """
         logging.info("Calibrating MSP threshold...")
         all_msp_scores = []
-        for batch in dataloader:
+        pbar = tqdm(dataloader, desc="Extracting MSP scores...", unit="batch")
+        for batch in pbar:
             x, _ = batch
             x = x.to(next(self.model.parameters()).device)
             with torch.no_grad():
@@ -51,7 +53,7 @@ class MSP:
             msp_scores (torch.Tensor): MSP scores of shape (B,).
         """
         msp_scores = self.get_msp_scores(logits)
-        is_ood = msp_scores < self.threshold
+        is_ood = (msp_scores < self.threshold).int()  # Convert to int for boolean representation
         return msp_scores, is_ood
 
     def get_msp_scores(self, logits: torch.Tensor) -> torch.Tensor:

@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import logging
 from typing import Tuple
+from tqdm import tqdm
 
 
 class KNNDetector:
@@ -43,7 +44,8 @@ class KNNDetector:
         device = next(self.model.parameters()).device  # Get the device of the model
 
         with torch.no_grad():
-            for batch_idx, batch in enumerate(dataloader):
+            pbar = tqdm(dataloader, desc="Extracting features for KNN fitting...", unit="batch")
+            for batch_idx, batch in enumerate(pbar):
                 if isinstance(batch, (list, tuple)):
                     x, y = batch[0], batch[1] if len(batch) > 1 else None
                 else:
@@ -61,8 +63,6 @@ class KNNDetector:
 
                 all_features.append(features)
 
-                if batch_idx % 100 == 0:
-                    logging.info(f"Processed {batch_idx} batches for KNN fitting...")
 
         # Concatenate all features
         self.training_features = np.concatenate(all_features, axis=0)

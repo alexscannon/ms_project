@@ -43,7 +43,8 @@ class ContinualLearning:
             ood_detector: OODDetector,
             config: DictConfig,
             model: torch.nn.Module,
-            checkpoint_class_info: dict
+            checkpoint_class_info: dict,
+            corrupted_dataloader: DataLoader | None = None,
         ) -> bool:
         """
         Runs a continual learning experiment on unlabeled streaming possibly covariate-shifted IND data and OOD data.
@@ -56,74 +57,94 @@ class ContinualLearning:
             config (DictConfig): Configuration for the continual learning method.
             model (torch.nn.Module): The model to be used in continual learning.
             checkpoint_class_info (dict): Class information from the pre-training checkpoint data.
+            corrupted_dataloader (torch.utils.data.DataLoader | None): Dataloader for corrupted data.
         Returns:
             None
         """
         # 1) Create a unified stream of IND and OOD data
-        unified_stream = self._merge_streams(left_out_ind_dataloader, ood_dataloader)
+        unified_stream = self._merge_streams(left_out_ind_dataloader, ood_dataloader, corrupted_dataloader)
+
         ind_classes = set(checkpoint_class_info.get("pretrain_classes", []))
+        if config.data.name == "tiny_imagenet":
+            ind_classes = set(left_out_ind_dataloader.dataset.targets) # type: ignore
 
-        example_counter = 0
         pbar = tqdm(unified_stream, desc="Continual learning: Processing data stream examples ...", unit="example")
-        for example_idx, (input, targets) in enumerate(pbar):
+        for batch_idx, (inputs, targets) in enumerate(pbar):
 
-            input = input.to(self.device) # 1) Move data to device
-            features, logits = extract_features_and_logits(input, model)  # 2) Extract features and logits
+            # 1) Move data to device
+            inputs = inputs.to(self.device)
+            targets = targets.to(self.device)
 
-            example_counter += 1
+            # 2) Extract features and logits
+            features, logits = extract_features_and_logits(inputs, model)  # 2) Extract features and logits
 
-            # 3) Determine OOD or IND
-            is_ood = ood_detector.determine_ood_or_ind(logits, config.ood_method, features)
-            self.y_pred_ood.append(int(is_ood))  # Store the prediction for OOD detection
-            self.y_true_ood.append(1 if np.int64(targets.item()) not in ind_classes else 0)  # Store the true label for OOD detection
+            # 3) Predict OOD or IND
+            is_ood = ood_detector.determine_ood_or_ind(logits, config.continual_learning.ood_method, features)
+            is_ood_list = is_ood.tolist()  # Convert to list for easier handling
+            self.y_pred_ood.extend(is_ood_list)  # Store the prediction for OOD detection
 
-            # 4) Assign pseudo-label if IND
-            if not is_ood:
-                self.ind_total += 1
-                pseudo_label = torch.argmax(logits, dim=1).item()  # Get the pseudo-label from the logits
-                self.insert_into_buffer(logits, pseudo_label) # TODO: Update model/buffer accordingly
+            # 4) Retrieve the True OOD labels
+            targets_list = targets.tolist()  # Convert targets to list for easier handling
+            if config.data.name == "cifar100":
+                reverse_class_mapping = {new_cls: old_cls for old_cls, new_cls in checkpoint_class_info.get("pretrain_class_mapping", {}).items()}
+                targets_is_ood_list = [1 if reverse_class_mapping.get(target) not in ind_classes else 0 for target in targets_list]
+            else:
+                targets_is_ood_list = [1 if target not in ind_classes else 0 for target in targets_list]
+            self.y_true_ood.extend(targets_is_ood_list)  # Store the true label for OOD detection
 
-                if self.ind_total > self.config.continual_learning.warmup_metric_period:
-                    if pseudo_label == targets.item():
-                        self.ind_correct += 1
-                    # TODO: Maybe break down by class classification performance
-                    wandb_logger.log({
-                        "classification/accuracy": (self.ind_correct / self.ind_total) * 100,
-                    })
+            self.ind_total += (len(is_ood_list) - sum(is_ood_list))  # Count only IND examples that the model has determined as IND
 
-            # 4) Every 100 examples: compute detection AUROC & classification performance, then log to W&B
-            if example_counter > self.config.continual_learning.warmup_metric_period: # Build a baseline for the first 100 examples
+            # 5) Make predictions, compute classification performance only on IND examples
+            pred_y = torch.argmax(logits, dim=1)  # Get the predicted-labels from the logits [0 - 79]
+            ind_mask = ~(is_ood.bool()) # Create a reverse mask for IND examples
+            ind_pred_y = pred_y[ind_mask] # Filter targets to only include IND examples
+            ind_targets = targets[ind_mask] # Filter targets to only include IND examples
+
+            correct = (ind_pred_y == ind_targets).sum().item()  # Count correct predictions
+            self.ind_correct += correct  # Update the count of correct predictions
+
+            self.insert_into_buffer(logits, pred_y) # TODO: Update model/buffer accordingly
+
+            if self.ind_total > self.config.continual_learning.warmup_metric_period:
+                # TODO: Maybe break down by class classification performance
+                wandb_logger.log({
+                    "classification/accuracy": (self.ind_correct / self.ind_total) * 100,
+                })
+
+            if (batch_idx + 1) > self.config.continual_learning.warmup_metric_period: # Build a baseline for the first 100 examples
                 f1, precision, ood_accuracy = self._compute_ood_metrics()
 
                 wandb_logger.log({
                     "ood/current_perecision": precision,
                     "ood/current_f1": f1,
-                    "ood/current_ood_accuracy": ood_accuracy,
-                    "stream_step": example_counter,
+                    "ood/current_ood_accuracy": ood_accuracy
                 })
         return True
 
-    def _merge_streams(self, ind_dataloader: DataLoader, ood_dataloader: DataLoader) -> DataLoader:
+    def _merge_streams(self, left_out_ind_dataloader: DataLoader, ood_dataloader: DataLoader, corrupted_dataloader: DataLoader | None) -> DataLoader:
         """
         Merges two dataloaders so that they are randomized and in a single dataloader.
 
         Args:
-            ind_dataloader (torch.utils.data.DataLoader): In-distribution dataloader.
+            left_out_ind_dataloader (torch.utils.data.DataLoader): Left-out training in-distribution dataloader.
             ood_dataloader (torch.utils.data.DataLoader): OOD dataloader.
+            corrupted_dataloader (torch.utils.data.DataLoader | None): Corruption dataloader.
         Returns:
-            unified_dataloader (torch.utils.data.DataLoader): The combined IND + OOD dataloader.
+            unified_dataloader (torch.utils.data.DataLoader): The combined IND + OOD + (optional) corruption dataloader.
         """
         # Create a combined dataset from both dataloaders
-        # combined_dataset = torch.utils.data.ConcatDataset([ind_dataloader.dataset, ood_dataloader.dataset])
-        combined_dataset = torch.utils.data.ConcatDataset([ind_dataloader.dataset])
+        # combined_dataset = torch.utils.data.ConcatDataset([ind_dataloader.dataset])
+        combined_dataset = torch.utils.data.ConcatDataset([left_out_ind_dataloader.dataset, ood_dataloader.dataset])
+        if corrupted_dataloader:
+            combined_dataset = torch.utils.data.ConcatDataset([combined_dataset, corrupted_dataloader.dataset])
 
-
+        # TODO: Revert the dataset arg back combined_dataset below
         # Create a new DataLoader with the combined dataset
         unified_dataloader = DataLoader(
-            combined_dataset,
+            dataset=combined_dataset, # type: ignore
             batch_size=self.config.continual_learning.batch_size,  # Currently set to 1 for streaming setting.
             shuffle=True,
-            num_workers=ind_dataloader.num_workers
+            num_workers=left_out_ind_dataloader.num_workers
         )
 
         return unified_dataloader
@@ -138,9 +159,12 @@ class ContinualLearning:
             Tuple[float, float, float]: F1 score, precision, and accuracy.
         """
         # Leverage your OODDetector to compute AUROC
-        precision = precision_score(self.y_true_ood, self.y_pred_ood, average='binary')
+        inverted_y_true = 1 - np.array(self.y_true_ood)
+        inverted_y_pred = 1 - np.array(self.y_pred_ood)  # Invert predictions for OOD detection
+
         accuracy = accuracy_score(self.y_true_ood, self.y_pred_ood)
-        f1 = f1_score(self.y_true_ood, self.y_pred_ood, average='binary')
+        precision = precision_score(inverted_y_true, inverted_y_pred)
+        f1 = f1_score(inverted_y_true, inverted_y_pred)
 
         return float(f1), float(precision), float(accuracy)
 

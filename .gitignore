@@ -1,9 +1,8 @@
 .env
 .DS_store
-data/
-outputs/
 .vscode
-wandb/
+
 outputs/
+wandb/
 
 **/__pycache__/

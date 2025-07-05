@@ -40,15 +40,19 @@ def main(config: DictConfig):
     logging.info(f"checkpoint_data['class_info'] attributes: {list(checkpoint_data['class_info'].keys())}")
 
     # Create new non-pretrained ViT model
-    model = create_model(config.data.image_size, int(config.data.num_classes * config.ind_class_ratio), config)
+    model = create_model(
+        img_size=config.data.image_size,
+        n_classes=int(config.data.num_classes * config.ind_class_ratio),
+        config=config
+    )
     # load model weights if pretrained in some way
     if config.model.pretrained:
         model.load_state_dict(checkpoint_data["model_state_dict"])
 
     # ============================ Dataset Loading ============================ #
     # Load remaining ID and OOD datasets
-    logging.info("Loading remaining ID and the OOD datasets...")
-    left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader = dataload(config, checkpoint_data)
+    logging.info("Loading left-out IND, OOD, and Corrupted datasets...")
+    left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader, corrupted_dataloader = dataload(config, checkpoint_data)
 
     # ============================ OOD detection ============================ #
     # Create OOD detector
@@ -64,15 +68,15 @@ def main(config: DictConfig):
     # ============================ Continual Learning ============================ #
     logging.info("Running Continual Learning scenario...")
     continual_learning = ContinualLearning(config, model, device)
-    # Stage 1: Handle the remaining in-distribution data in a continual learning setting
     continual_learning.run_covariate_continual_learning(
-        left_out_ind_dataloader=left_in_ind_dataloader,
+        left_out_ind_dataloader=left_out_ind_dataloader,
         ood_dataloader=ood_dataloader,
         wandb_logger=wand_logger,
         ood_detector=ood_detector,
         config=config,
         model=model,
-        checkpoint_class_info=checkpoint_data["class_info"]
+        checkpoint_class_info=checkpoint_data["class_info"],
+        corrupted_dataloader=corrupted_dataloader
     )
 
     wand_logger.finish(exit_code=0)

@@ -1,7 +1,21 @@
 
-cifar100C_location: "/home/alex/data/CIFAR-100-C" # Location of CIFAR-100-C dataset
-tinyimagenetC_location: "/home/alex/data/Tiny-ImageNet-C" # Location of Tiny-ImageNet-C dataset
-batch_size: 1 # Batch size of 1 is meant for a streaming setting
-warmup_metric_period: 100 # number of examples to wait before computing the metric
+corruption_injection: true # Whether to inject corruptions into the dataset
+corruption_type: "gaussian_noise" # Type of corruption to inject,
+# e.g., [brightness, gaussian_noise, shot_noise, impulse_noise, defocus_blur, glass_blur, motion_blur,
+        # zoom_blur, snow, frost, fog, brightness, contrast, elastic_transform, pixelate, jpeg_compression]
+corruption_severity: 1 # Severity level of the corruption, typically from 1 to 5
 
-ood_method: "knn"
+# CIFAR-100-C Information
+cifar100C_location: "/home/alex/data/CIFAR-100-C" # Location of CIFAR-100-C dataset
+cifar100C_mean: [0.5071, 0.4867, 0.4408] # Mean for CIFAR-100-C dataset
+cifar100C_std: [0.2675, 0.2565, 0.2761] # Standard deviation for CIFAR-100-C dataset
+
+# Tiny-ImageNet-C Information
+tinyimagenetC_location: "/home/alex/data/Tiny-ImageNet-C" # Location of Tiny-ImageNet-C dataset
+tinyimagenetC_mean: [0.485, 0.456, 0.406] # Mean for Tiny-ImageNet-C dataset
+tinyimagenetC_std: [0.229, 0.224, 0.225] # Standard deviation for Tiny-ImageNet-C dataset
+
+batch_size: 64 # Batch size of 1 is meant for a streaming setting
+warmup_metric_period: 10 # number of examples to wait before computing the metric
+
+ood_method: "msp" # OOD detection method to use. Options: msp, odin, mahalanobis, energy, knn

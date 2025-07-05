@@ -1,66 +1,33 @@
-import os
-import random
-import shutil
-from typing import Any, Tuple
+from typing import Tuple
 from omegaconf import DictConfig
-import torch
-from torchvision import datasets, transforms
 import logging
 from torch.utils.data import Subset, DataLoader, Dataset
-import numpy as np
-from colorama import Fore, Style
 
-from src.data.cifar100_dataset import CIFAR100Dataset
-from src.data.tiny_imagenet_dataset import TinyImagenetDataset
+from .cifar100 import CIFAR100Dataset
+from .cifar100C import CIFAR100CDataset
+from .tiny_imagenet import TinyImagenetDataset
+from .tiny_imagenet_c import TinyImagenetCDataset
 from src.data.utils import ClassRemappingDataset
 
 
-# def datainfo(config: DictConfig) -> dict[str, Any]:
-#     if config.data.name == 'cifar10':
-#         print(Fore.YELLOW + '*' * 80)
-#         logging.debug('CIFAR10')
-#         print('*'*80 + Style.RESET_ALL)
-#         n_classes = config.data.num_classes
-#         img_mean, img_std = config.data.mean, config.data.std
-#         img_size = config.data.image_size
-
-#     elif config.data.name == 'cifar100':
-#         print(Fore.YELLOW+'*'*80)
-#         logging.debug('CIFAR100')
-#         print('*'*80 + Style.RESET_ALL)
-#         n_classes = config.data.num_classes
-#         img_mean, img_std = config.data.mean, config.data.std
-#         img_size = config.data.image_size
-
-#     elif config.data.name == 'svhn':
-#         print(Fore.YELLOW+'*'*80)
-#         logging.debug('SVHN')
-#         print('*' * 80 + Style.RESET_ALL)
-#         n_classes = config.data.num_classes
-#         img_mean, img_std = config.data.mean, config.data.std
-#         img_size = config.data.image_size
-
-#     elif config.data.name == 'tiny_imagenet':
-#         print(Fore.YELLOW + '*' * 80)
-#         logging.debug('T-IMNET')
-#         print('*' * 80 + Style.RESET_ALL)
-#         n_classes = config.data.num_classes
-#         img_mean, img_std = config.data.mean, config.data.std
-#         img_size = config.data.image_size
-
-#     data_info = {
-#         'n_classes': n_classes,
-#         'stat': (img_mean, img_std),
-#         'img_size': img_size
-#     }
-
-#     return data_info
-
-
-def dataload(config: DictConfig, checkpoint_data: dict):
+def dataload(config: DictConfig, checkpoint_data: dict) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader | None]:
     """
-    TODO: Documentation
+    Load the in-distribution and out-of-distribution datasets based on the configuration.
+    Args:
+        config (DictConfig): Configuration object containing dataset parameters.
+        checkpoint_data (dict): Checkpoint dictionary containing 'class_info'
+                                'class_info' is expected to follow the structure from
+                                pre-training, including 'pretrain_classes', 'left_out_classes',
+                                'pretrained_ind_indices', 'left_out_ind_indices', and 'ind_class_mapping'.
+    Returns:
+        left_in_ind_dataloader (torch.utils.data.DataLoader): Dataloader for in-distribution examples used during pre-training.
+        left_out_ind_dataloader (torch.utils.data.DataLoader): Dataloader for in-distribution examples not used during pre-training.
+        ood_dataloader (torch.utils.data.DataLoader): Dataloader for out-of-distribution examples.
+        corruption_dataloader (torch.utils.data.DataLoader | None): Dataloader for the corruption dataset used for continual learning scenario.
+    Raises:
+        NotImplementedError: If the dataset is not supported.
     """
+    corruption_dataloader = None
 
     if config.data.name == 'cifar10':
         raise NotImplementedError("[Error] CIFAR10 dataset is not supported...")
@@ -70,22 +37,28 @@ def dataload(config: DictConfig, checkpoint_data: dict):
 
     elif config.data.name == 'cifar100':
         cifar100DatasetWrapper = CIFAR100Dataset(config)
-        train_dataset = cifar100DatasetWrapper.train
-        val_dataset = cifar100DatasetWrapper.val
-        logging.info(f"Length of raw train dataset: {len(train_dataset)}")
-        logging.info(f"Length of raw val dataset: {len(val_dataset)}")
+        if config.continual_learning.corruption_injection:
+            corruption_dataset = CIFAR100CDataset(config=config).get_dataset(config.continual_learning.corruption_severity)
 
-        left_in_ind_dataset, left_out_ind_dataset, ood_dataset = create_sub_datasets(checkpoint_data, train_dataset, val_dataset)
+        train_dataset = cifar100DatasetWrapper.train
+        val_dataset = cifar100DatasetWrapper.val # Not currently used but could be useful in the future.
+
+        left_in_ind_dataset, left_out_ind_dataset, ood_dataset = create_sub_datasets(checkpoint_data, train_dataset)
 
     elif config.data.name == 'tiny_imagenet':
         tinyImagenetDatasetWrapper = TinyImagenetDataset(config)
+
         left_in_ind_dataset = tinyImagenetDatasetWrapper.train_ind_in_dataset
         left_out_ind_dataset = tinyImagenetDatasetWrapper.train_ind_out_dataset
         ood_dataset = tinyImagenetDatasetWrapper.ood_dataset
+        if config.continual_learning.corruption_injection:
+            corruption_dataset = TinyImagenetCDataset(config=config).get_dataset(config.continual_learning.corruption_severity)
 
     else:
         raise NotImplementedError(f"[Error] {config.data.name} not supported...")
 
+
+    # Create DataLoaders for the datasets
     left_in_ind_dataloader = DataLoader(
         dataset=left_in_ind_dataset,
         batch_size=config.data.batch_size,
@@ -108,29 +81,39 @@ def dataload(config: DictConfig, checkpoint_data: dict):
         pin_memory=config.data.pin_memory
     )
 
-    return left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader
+    if config.continual_learning.corruption_injection:
+        corruption_dataloader = DataLoader(
+            dataset=corruption_dataset,
+            batch_size=config.data.batch_size,
+            shuffle=True,
+            num_workers=config.data.num_workers,
+            pin_memory=config.data.pin_memory
+        )
+
+    return left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader, corruption_dataloader
 
 
 
 
-def create_sub_datasets(checkpoint_data: dict, train_dataset: Dataset, val_dataset: Dataset) -> Tuple[Dataset, Dataset, Dataset]:
+def create_sub_datasets(checkpoint_data: dict, train_dataset: Dataset) -> Tuple[Dataset, Dataset, Dataset]:
     """
     Create ID and OOD datasets based on class_info from the checkpoint object if supported by dataset (ex., CIFAR100).
     The `pretrained_ind_dataloader` will have its labels remapped for fitting OOD detectors
     that expect consecutive class labels (0 to N-1).
 
     Args:
-        config (DictConfig): Configuration
         checkpoint_data (dict): Checkpoint dictionary containing 'class_info'.
                                 'class_info' is expected to follow the structure from
                                 pre-training, including 'pretrain_classes', 'left_out_classes',
                                 'pretrained_ind_indices', 'left_out_ind_indices', and 'ind_class_mapping'.
+        train_dataset (torch.utils.data.Dataset): Complete training dataset.
     Returns:
-        left_in_ind_dataset
-        left_out_ind_dataset
-        ood_dataset
+        left_in_ind_dataset (torch.utils.data.Dataset): Dataset containing in-distribution examples that were used during pre-training.
+        left_out_ind_dataset (torch.utils.data.Dataset): Dataset containing in-distribution examples that were not used during pre-training.
+        ood_dataset (torch.utils.data.Dataset): Dataset containing out-of-distribution examples.
     """
     class_info = checkpoint_data.get('class_info', None)
+
     if class_info is None:
         logging.error("'class_info' is missing from checkpoint_data. Cannot create OOD dataloaders.")
         raise ValueError("[Error] 'class_info' is missing from checkpoint_data. Cannot create OOD dataloaders.")
@@ -138,6 +121,7 @@ def create_sub_datasets(checkpoint_data: dict, train_dataset: Dataset, val_datas
     pretrained_ind_indices = class_info.get('pretrained_ind_indices', [])
     left_out_ind_indices = class_info.get('left_out_ind_indices', [])
     ood_example_idxs = class_info.get('ood_example_idxs', [])
+
     pretrain_class_mapping = class_info.get('pretrain_class_mapping', [])
 
     left_in_ind_dataset = ClassRemappingDataset(

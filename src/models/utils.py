@@ -9,9 +9,8 @@ def extract_features_and_logits(x: torch.Tensor, model: torch.nn.Module) -> Tupl
     Args:
         x (torch.Tensor): Input tensor
     Returns:
-        tuple: A tuple containing:
-            features (torch.Tensor): 'Features from the model'
-            logits (torch.Tensor): 'Logits from the model'
+        features (torch.Tensor): Features from the model.
+        logits (torch.Tensor): Logits from the model.
     """
     model.eval() # Set model to evaluation mode
     logits = model(x)

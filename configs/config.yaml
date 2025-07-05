@@ -3,17 +3,17 @@
 defaults:
   - _self_
   - model: model
-  - data: cifar100 # options: cifar100, tiny_imagenet
+  - data: cifar100 # options: cifar100 / tiny_imagenet
   - ood: ood
   - continual_learning: continual_learning
   - logging: wandb # options: wandb, tensorboard, none
 
 # General
 seed: 42 # random seed for reproducability
-device: cuda # CHANGE TO "gpu" IF YOU HAVE ONE
+device: cuda # CHANGE TO "cuda" IF YOU HAVE ONE
 output_dir: /home/alex/repos/ms_project/results/ # Change this to your own path
 ind_class_ratio: 0.8 # 80% of classes used for IND training data
 ind_example_ratio: 0.75 # 75% of examples used for IND training data
+run_ood_detection: false # Whether to run a pure OOD detection analysis
 
-ood_method: msp # OOD detection method to use. Options: msp, odin, mahalanobis, energy, knn
 # save_model: false # save the model after training

@@ -41,7 +41,7 @@ class OODDetector:
 
         fit_methods = ["mahalanobis", "knn", "msp"]
         for method in fit_methods:
-            if method in self.detectors:
+            if (method in self.detectors) and ((method in config.continual_learning.ood_method) or config.run_ood_detection):
                 self.detectors[method].fit(
                     self.left_in_ind_dataloader,
                     extract_features_and_logits,
@@ -68,7 +68,7 @@ class OODDetector:
         plot_roc_curves(left_out_ind_stats, ood_stats, detector_names=list(aurocs.keys()))
         return aurocs
 
-    def determine_ood_or_ind(self, logits: torch.Tensor, ood_method: str, features: torch.Tensor) -> bool:
+    def determine_ood_or_ind(self, logits: torch.Tensor, ood_method: str, features: torch.Tensor) -> torch.Tensor:
         """
         Given a valid ood methodology, determines if the current example is OOD (out-of-distribution) or IND (in-distribution).
 
@@ -77,7 +77,7 @@ class OODDetector:
             ood_method (str): The OOD detection method to use. Options include "msp", "odin", "mahalanobis", "energy", "knn".
             features (torch.Tensor): The features extracted from the input example, used for some OOD methods.
         Returns:
-            is_ood (bool): True if the example is OOD, False if it is IND.
+            is_ood (torch.Tensor): True if the example is OOD, False if it is IND.
         """
 
         if ood_method == "msp":
