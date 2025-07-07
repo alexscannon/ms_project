@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - model: model
-  - data: cifar100 # options: cifar100 / tiny_imagenet
+  - data: tiny_imagenet # options: cifar100 / tiny_imagenet
   - ood: ood
   - continual_learning: continual_learning
   - logging: wandb # options: wandb, tensorboard, none

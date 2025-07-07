@@ -105,13 +105,13 @@ class ContinualLearning:
 
             self.insert_into_buffer(logits, pred_y) # TODO: Update model/buffer accordingly
 
-            if self.ind_total > self.config.continual_learning.warmup_metric_period:
+            if (self.ind_total % self.config.continual_learning.warmup_metric_period) == 0:
                 # TODO: Maybe break down by class classification performance
                 wandb_logger.log({
                     "classification/accuracy": (self.ind_correct / self.ind_total) * 100,
                 })
 
-            if (batch_idx + 1) > self.config.continual_learning.warmup_metric_period: # Build a baseline for the first 100 examples
+            if ((batch_idx + 1) % self.config.continual_learning.warmup_metric_period) == 0: # Build a baseline for the first 100 examples
                 f1, precision, ood_accuracy = self._compute_ood_metrics()
 
                 wandb_logger.log({
