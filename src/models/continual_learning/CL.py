@@ -8,7 +8,8 @@ from sklearn.metrics import precision_score, accuracy_score, f1_score
 
 from src.loggers.wandb_logger import WandBLogger
 from src.models.ood.ood_detector import OODDetector
-from src.models.utils import extract_features_and_logits
+from src.models.utils import extract_features_and_logits, get_feature_dim
+from src.models.continual_learning.clustering.streaming_gaussian_clusters import StreamingGaussianClusters
 
 
 
@@ -17,7 +18,7 @@ class ContinualLearning:
     Base class for continual learning methods.
     """
 
-    def __init__(self, config: DictConfig, model: torch.nn.Module, device: torch.device):
+    def __init__(self, config: DictConfig, model: torch.nn.Module, device: torch.device, left_in_dataloader: DataLoader):
         """
         Initialize the CL class with configuration, model, and device.
 
@@ -25,6 +26,7 @@ class ContinualLearning:
             config (DictConfig): Configuration for the continual learning method.
             model (torch.nn.Module): The model to be used in continual learning.
             device (torch.device): The device on which the model will run.
+            left_in_dataloader (torch.data.utils.DataLoader): Dataloader for all the training examples
         """
         self.config = config
         self.model = model
@@ -33,9 +35,17 @@ class ContinualLearning:
         self.y_pred_ood = []  # Predicted labels for OOD data
         self.ind_total = 0
         self.ind_correct = 0
+        self.feature_dim = get_feature_dim(model=self.model, config=self.config, device=self.device)
+
+        self.clusters = StreamingGaussianClusters(
+            num_classes=self.config.data.num_ind_classes,
+            training_dataloader=left_in_dataloader,
+            feature_dim=self.feature_dim,
+            device=device
+        )
 
 
-    def run_covariate_continual_learning(
+    def run_covariate_continual_learning_inference(
             self,
             left_out_ind_dataloader: DataLoader,
             ood_dataloader: DataLoader,

@@ -2,7 +2,6 @@ import torch
 from omegaconf import DictConfig
 from tqdm import tqdm
 import logging
-from torch import device as TorchDevice
 from typing import Callable
 
 
@@ -14,7 +13,7 @@ class MahalanobisDetector:
     Scores are negative Mahalanobis distances (higher is more in-distribution).
     """
 
-    def __init__(self, model: torch.nn.Module, ood_config: DictConfig, device: TorchDevice = torch.device('cuda')):
+    def __init__(self, model: torch.nn.Module, ood_config: DictConfig, device: torch.device = torch.device('cuda')):
         self.model = model # Used to infer feature dimensionality if needed, but fit takes feature_extractor
         self.ood_config = ood_config
         self.device = device

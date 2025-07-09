@@ -12,9 +12,8 @@ import logging
 # Cell 4: Configuration
 TINY_IMAGENET_URL = 'http://cs231n.stanford.edu/tiny-imagenet-200.zip' # Or use .tar.gz if preferred
 
-DRIVE_MOUNT_POINT = '/home/alex/data' # Optional: Google Drive mount point 
+DRIVE_MOUNT_POINT = '/home/alex/data' # Optional: Google Drive mount point
 DATA_DIR = DRIVE_MOUNT_POINT + '/tiny-imagenet-200'
-SAVE_DIR = DATA_DIR + '/preprocessed_tinyimagenet'
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 RANDOM_SEED = 42
@@ -41,10 +40,6 @@ print(f"Using device: {DEVICE}")
 # Create a directory for our dataset
 os.makedirs(DATA_DIR, exist_ok=True)
 print(f"Data will be saved in: {DATA_DIR}")
-
-os.makedirs(SAVE_DIR, exist_ok=True)
-print(f"Preprocessed data will be saved in: {SAVE_DIR}")
-
 
 # URL for the Tiny-ImageNet dataset
 zip_path = os.path.join(DATA_DIR, 'tiny-imagenet-200.zip')

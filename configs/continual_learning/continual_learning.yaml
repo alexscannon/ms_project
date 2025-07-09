@@ -22,9 +22,7 @@ tinyimagenetC_std: [0.229, 0.224, 0.225] # Standard deviation for Tiny-ImageNet-
 
 
 
-
-
-batch_size: 128 # Batch size of 1 is meant for a streaming setting
+batch_size: 1 # Batch size of 1 is meant for a streaming setting
 warmup_metric_period: 20 # number of examples to wait before computing the metric
 
 ood_method: "msp" # OOD detection method to use. Options: msp, odin, mahalanobis, energy, knn

@@ -11,7 +11,6 @@ from tqdm import tqdm
 from src.models.ood.energy import EnergyDetector
 from src.models.ood.knn import KNNDetector
 from src.utils import plot_roc_curves
-from torch import device as TorchDevice
 from torch.utils.data import DataLoader
 from src.models.utils import extract_features_and_logits
 
@@ -20,7 +19,7 @@ class OODDetector:
     OOD detector class supporting multiple OOD detection methods.
     """
 
-    def __init__(self, config: DictConfig, model: torch.nn.Module, left_in_ind_dataloader: DataLoader, device: TorchDevice = torch.device('cuda'), temperature: float = 1.0):
+    def __init__(self, config: DictConfig, model: torch.nn.Module, left_in_ind_dataloader: DataLoader, device: torch.device = torch.device('cuda'), temperature: float = 1.0):
         self.config = config
         self.model = model
         self.device = device

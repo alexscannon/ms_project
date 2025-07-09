@@ -67,8 +67,10 @@ def main(config: DictConfig):
 
     # ============================ Continual Learning ============================ #
     logging.info("Running Continual Learning scenario...")
-    continual_learning = ContinualLearning(config, model, device)
-    continual_learning.run_covariate_continual_learning(
+    continual_learning = ContinualLearning(
+        config=config, model=model, device=device, left_in_dataloader=left_in_ind_dataloader
+    )
+    continual_learning.run_covariate_continual_learning_inference(
         left_out_ind_dataloader=left_out_ind_dataloader,
         ood_dataloader=ood_dataloader,
         wandb_logger=wand_logger,
