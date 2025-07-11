@@ -41,7 +41,8 @@ class ContinualLearning:
             num_classes=self.config.data.num_ind_classes,
             training_dataloader=left_in_dataloader,
             feature_dim=self.feature_dim,
-            device=device
+            device=device,
+            model=self.model
         )
 
 
