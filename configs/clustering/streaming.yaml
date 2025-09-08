@@ -1,0 +1,6 @@
+defaults:
+  - clustering_algorithms: denstream
+batch_size: 5   # Number of examples to process at once
+buffer_size: 5  # Size of feature buffer for clustering updates
+evaluation_interval: 100  # How often to evaluate
+stream_speed: 0.0  # Delay between batches (seconds)

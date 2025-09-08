@@ -38,3 +38,44 @@ def extract_features_and_logits(x: torch.Tensor, model: torch.nn.Module) -> Tupl
         features = logits
 
     return features, logits
+
+
+def assign_to_clusters(embeddings: torch.Tensor, ood_threshold: float, num_classes: int, device: torch.device, stream_clusters) -> torch.Tensor:
+    """
+    Assigns each embedding to the nearest cluster or to OOD (-1) based on Mahalanobis distance.
+
+    Args:
+        embeddings: Tensor of shape [batch_size, feature_dim] containing the embeddings
+        ood_threshold: Maximum Mahalanobis distance threshold for in-distribution assignment
+
+    Returns:
+        Tensor of shape [batch_size] with cluster assignments (-1 for OOD)
+    """
+    batch_size = embeddings.shape[0]
+
+    # Initialize tensor to store distances to each cluster
+    all_distances = torch.zeros(batch_size, num_classes, device=device)
+
+    # Calculate Mahalanobis distance to each cluster
+    for class_id in range(num_classes):
+        cluster = stream_clusters.clusters[class_id]
+
+        # Calculate (x - μ) for all embeddings in the batch
+        centered = embeddings - cluster.mu
+
+        # Calculate Mahalanobis distance: (x - μ)^T Σ^-1 (x - μ)
+        # Using einsum for efficient matrix multiplication
+        mahalanobis_distances = torch.einsum('bi,ij,bj->b', centered, cluster.inv_sigma, centered)
+        all_distances[:, class_id] = mahalanobis_distances
+
+    # Find minimum distance and corresponding cluster for each embedding
+    min_distances, closest_clusters = torch.min(all_distances, dim=1)
+
+    # Create mask for OOD examples (where min distance > threshold)
+    ood_mask = min_distances > ood_threshold
+
+    # Assign final cluster IDs (-1 for OOD)
+    cluster_assignments = closest_clusters.clone()
+    cluster_assignments[ood_mask] = -1
+
+    return cluster_assignments

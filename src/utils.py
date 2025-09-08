@@ -31,8 +31,8 @@ def set_seed(seed: int = 42) -> None:
         torch.backends.cudnn.benchmark = False  # Disable benchmarking for reproducibility
 
     # Document the environment for future reproducibility
-    print(f"PyTorch version: {torch.__version__}")
-    print(f"CUDA version: {version.cuda if torch.cuda.is_available() else 'N/A'}")
+    logging.info(f"PyTorch version: {torch.__version__}")
+    logging.info(f"CUDA version: {version.cuda if torch.cuda.is_available() else 'N/A'}")
 
     logging.info(f"Random seed set to {seed} for reproducibility.")
 

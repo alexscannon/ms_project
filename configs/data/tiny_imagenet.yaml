@@ -29,3 +29,4 @@ std: [0.229, 0.224, 0.225]  # Example: ImageNet std for normalization
 batch_size: 64
 num_workers: 4
 pin_memory: true
+shuffle: true

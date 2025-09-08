@@ -1,0 +1,6 @@
+threshold: 1.5
+fading: 0.05
+intersection_factor: 0.5
+minimum_weight: 1.0
+cleanup_interval: 50.0  # How often to clean up clusters
+name: dbstream

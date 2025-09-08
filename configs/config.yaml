@@ -3,12 +3,14 @@
 defaults:
   - _self_
   - model: model
-  - data: tiny_imagenet # options: cifar100 / tiny_imagenet
+  - data: cifar100 # options: cifar100 / tiny_imagenet
   - ood: ood
   - continual_learning: continual_learning
   - logging: wandb # options: wandb, tensorboard, none
+  - clustering: streaming
 
 # General
+is_old_experiment: false # Whether to run the old experiment
 seed: 42 # random seed for reproducability
 device: cuda # CHANGE TO "cuda" IF YOU HAVE ONE
 output_dir: /home/alex/repos/ms_project/results/ # Change this to your own path

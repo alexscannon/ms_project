@@ -9,5 +9,5 @@ std: [0.2470, 0.2435, 0.2616]
 batch_size: 32
 num_workers: 4
 pin_memory: true
-
-location: /content/drive/MyDrive/data/cifar10/
+shuffle: true
+location: /home/alex/data/

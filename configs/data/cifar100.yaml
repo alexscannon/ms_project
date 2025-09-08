@@ -13,3 +13,4 @@ num_ood_classes: 20 # Number of out-of-distribution classes
 batch_size: 32
 num_workers: 4
 pin_memory: true
+shuffle: true

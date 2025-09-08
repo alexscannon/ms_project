@@ -8,7 +8,7 @@ from sklearn.metrics import precision_score, accuracy_score, f1_score
 
 from src.loggers.wandb_logger import WandBLogger
 from src.models.ood.ood_detector import OODDetector
-from src.models.utils import extract_features_and_logits, get_feature_dim
+from src.models.utils import extract_features_and_logits, get_feature_dim, assign_to_clusters
 from src.models.continual_learning.clustering.streaming_gaussian_clusters import StreamingGaussianClusters
 
 
@@ -88,6 +88,13 @@ class ContinualLearning:
 
             # 2) Extract features and logits
             features, logits = extract_features_and_logits(inputs, model)  # 2) Extract features and logits
+            cluster_assignments = assign_to_clusters(
+                embeddings=features,
+                ood_threshold=0.70,
+                num_classes=len(ind_classes),
+                device=self.device,
+                stream_clusters=self.clusters,
+            )
 
             # 3) Predict OOD or IND
             is_ood = ood_detector.determine_ood_or_ind(logits, config.continual_learning.ood_method, features)

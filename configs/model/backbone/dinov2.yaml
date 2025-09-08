@@ -1,0 +1,8 @@
+name: dinov2
+model_size: base
+
+# dataset_options:
+expected_input_size: 256
+center_crop: 224
+mean: [0.485, 0.456, 0.406]
+std: [0.229, 0.224, 0.225]

@@ -2,6 +2,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import torch
 import logging
+from dotenv import load_dotenv
 
 from src.models.backbone.create_model import create_model
 from src.data.dataset_loader import dataload
@@ -10,10 +11,14 @@ from src.models.ood.ood_detector import OODDetector
 from src.models.continual_learning.CL import ContinualLearning
 from src.loggers.wandb_logger import WandBLogger
 from src.utils import set_seed
+from src.data.cifar100 import CIFAR100Dataset
+from src.clustering.cluster_runner import run_streaming_experiment
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config: DictConfig):
-    logging.info(f"Configuration: {OmegaConf.to_yaml(config)}")
+    # logging.info(f"Loaded Configuration: {OmegaConf.to_yaml(config)}")
+    load_dotenv()
+    logging.info(f"Loaded Configuration...")
 
     # ============================ Experiment setup ============================ #
     # Set random seed for reproducibility
@@ -33,53 +38,70 @@ def main(config: DictConfig):
 
 
     # ============================ Load pre-trained model ============================ #
-    logging.info("Loading pre-trained Vision Transformer model...")
-    checkpoint_data = get_checkpoint_dict(config.data.name, config, device)
-
-    logging.info(f"checkpoint_data attributes: {checkpoint_data.keys()}")
-    logging.info(f"checkpoint_data['class_info'] attributes: {list(checkpoint_data['class_info'].keys())}")
-
     # Create new non-pretrained ViT model
     model = create_model(
         img_size=config.data.image_size,
         n_classes=int(config.data.num_classes * config.ind_class_ratio),
         config=config
     )
-    # load model weights if pretrained in some way
-    if config.model.pretrained:
+
+    # load model weights if there exists pretrained weights.
+    if config.model.pretrained and config.model.backbone.name == 'vit':
+        logging.info("Loading pre-trained Vision Transformer model...")
+        checkpoint_data = get_checkpoint_dict(config.data.name, config, device)
+
+        logging.info(f"checkpoint_data attributes: {checkpoint_data.keys()}")
+        logging.info(f"checkpoint_data['class_info'] attributes: {list(checkpoint_data['class_info'].keys())}")
         model.load_state_dict(checkpoint_data["model_state_dict"])
 
-    # ============================ Dataset Loading ============================ #
-    # Load remaining ID and OOD datasets
-    logging.info("Loading left-out IND, OOD, and Corrupted datasets...")
-    left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader, corrupted_dataloader = dataload(config, checkpoint_data)
+    # ======================================================== #
+    # ==================== OLD EXPERIMENT ==================== #
+    # ======================================================== #
+    if config.is_old_experiment:
+        # ============================ Dataset Loading ============================ #
+        # Load remaining ID and OOD datasets
+        logging.info("Loading left-out IND, OOD, and Corrupted datasets...")
+        left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader, corrupted_dataloader = dataload(config, checkpoint_data)
 
-    # ============================ OOD detection ============================ #
-    # Create OOD detector
-    logging.info("Creating OOD detector...")
-    ood_detector = OODDetector(config, model, left_in_ind_dataloader, device)
+        # ============================ OOD detection ============================ #
+        # Create OOD detector
+        logging.info("Creating OOD detector...")
+        ood_detector = OODDetector(config, model, left_in_ind_dataloader, device)
 
-    # Run OOD detection
-    # logging.info("Running OOD detection...")
-    # aurocs = ood_detector.run_ood_detection(left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader)
-    # formatted_aurocs = {k: f"{v * 100:.2f}%" for k, v in aurocs.items()}
-    # logging.info(f"AUROCs: {formatted_aurocs}")
+        # Run OOD detection
+        # logging.info("Running OOD detection...")
+        # aurocs = ood_detector.run_ood_detection(left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader)
+        # formatted_aurocs = {k: f"{v * 100:.2f}%" for k, v in aurocs.items()}
+        # logging.info(f"AUROCs: {formatted_aurocs}")
 
-    # ============================ Continual Learning ============================ #
-    logging.info("Running Continual Learning scenario...")
-    continual_learning = ContinualLearning(
-        config=config, model=model, device=device, left_in_dataloader=left_in_ind_dataloader
-    )
-    continual_learning.run_covariate_continual_learning_inference(
-        left_out_ind_dataloader=left_out_ind_dataloader,
-        ood_dataloader=ood_dataloader,
-        wandb_logger=wand_logger,
-        ood_detector=ood_detector,
-        config=config,
-        model=model,
-        checkpoint_class_info=checkpoint_data["class_info"],
-        corrupted_dataloader=corrupted_dataloader
-    )
+        # ============================ Continual Learning ============================ #
+        logging.info("Running Continual Learning scenario...")
+        continual_learning = ContinualLearning(
+            config=config, model=model, device=device, left_in_dataloader=left_in_ind_dataloader
+        )
+        continual_learning.run_covariate_continual_learning_inference(
+            left_out_ind_dataloader=left_out_ind_dataloader,
+            ood_dataloader=ood_dataloader,
+            wandb_logger=wand_logger,
+            ood_detector=ood_detector,
+            config=config,
+            model=model,
+            checkpoint_class_info=checkpoint_data["class_info"],
+            corrupted_dataloader=corrupted_dataloader
+        )
+    # ======================================================== #
+    # ==================== NEW EXPERIMENT ==================== #
+    # ======================================================== #
+    else:
+        logging.info(f"Loading dataset: {config.data.name}...")
+        dataset = CIFAR100Dataset(config).all_data
+        logging.info(f"Successfully loaded dataset...")
+
+        run_streaming_experiment(model, dataset, config)
+
+
+
+
 
     wand_logger.finish(exit_code=0)
 

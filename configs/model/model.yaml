@@ -1,5 +1,5 @@
 defaults:
-  - backbone: vit
+  - backbone: dinov2
   - adapter: lora
 
 pretrained: true

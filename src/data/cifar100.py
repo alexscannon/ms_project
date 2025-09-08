@@ -23,8 +23,25 @@ class CIFAR100Dataset():
         self.all_data = torch.utils.data.ConcatDataset([self.train, self.val])
 
     def transform(self):
-        return transforms.Compose([
-            transforms.Resize(self.config.data.image_size), # Resize to the input size of the ViT model
-            transforms.ToTensor(),
-            transforms.Normalize(self.config.data.mean, self.config.data.std) # Normalize the data
-        ])
+        if self.config.model.backbone.name == 'vit':
+            transform = transforms.Compose([
+                transforms.Resize(size=self.config.data.image_size), # Resize to the input size of the ViT model
+                transforms.ToTensor(),
+                transforms.Normalize(self.config.data.mean, self.config.data.std) # Normalize the data
+            ])
+
+        elif self.config.model.backbone.name == 'dinov2':
+            transform = transforms.Compose([
+                transforms.Resize(
+                    size=self.config.model.backbone.expected_input_size,
+                    interpolation=transforms.InterpolationMode.BICUBIC
+                ),
+                transforms.CenterCrop(size=self.config.model.backbone.center_crop),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=self.config.model.backbone.mean, std=self.config.model.backbone.std),
+            ])
+
+        else:
+            raise ValueError(f"Model backbone {self.config.model.backbone.name} not supported")
+
+        return transform

@@ -1,0 +1,8 @@
+components: 200
+concentration: 0.001
+weight_concentration_prior_type: dirichlet_process
+covariance_type: diag
+max_iter: 30
+warm_start: true
+init_params: kmeans
+name: dpgmm

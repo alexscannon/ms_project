@@ -1,0 +1,5 @@
+epsilon: 0.5
+mu: 2.5
+beta: 0.5
+lambda_: 0.01
+name: denstream

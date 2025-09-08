@@ -1,6 +1,4 @@
 import torch
-from torch.nn import Module
-from torch import device as TorchDevice
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -8,7 +6,7 @@ from src.models.utils import extract_features_and_logits
 from src.models.continual_learning.clustering.gaussian_cluster import GaussianCluster
 
 class StreamingGaussianClusters:
-    def __init__(self, num_classes: int, training_dataloader: DataLoader, feature_dim: int, device: TorchDevice, model: Module):
+    def __init__(self, num_classes: int, training_dataloader: DataLoader, feature_dim: int, device: torch.device, model: torch.nn.Module):
         self.num_classes = num_classes
         self.training_dataloader = training_dataloader
         self.feature_dim = feature_dim
@@ -30,7 +28,7 @@ class StreamingGaussianClusters:
         class_x_xt = {i: torch.zeros(self.feature_dim, self.feature_dim, device=self.device) for i in range(self.num_classes)}
 
         # Process all batches and accumulate statistics
-        pbar = tqdm(self.training_dataloader, desc="Accumulating statistics...")
+        pbar = tqdm(self.training_dataloader, desc="Accumulating initial cluster statistics for training data...")
         for batch_id, (inputs, targets) in enumerate(pbar):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
 
@@ -73,3 +71,17 @@ class StreamingGaussianClusters:
                 cluster.log_determinate = torch.slogdet(cluster.sigma)[1].item()
 
 
+        # pbar = tqdm(self.training_dataloader, desc="Constructing clusters with training data...")
+        # for batch_id, (inputs, targets) in enumerate(pbar):
+        #     inputs, targets = inputs.to(self.device), targets.to(self.device)
+        #     # Lower the dimensionality by extracting the features.
+        #     with torch.no_grad():
+        #         features, logits = extract_features_and_logits(x=inputs, model=self.model)
+
+        #     # Assign the class specific examples to each cluster from the batch tensor
+        #     for class_id in targets.unique():
+        #         class_mask = targets == class_id
+        #         class_features = features[class_mask]
+
+        #         # Update the corresponding cluster
+        #         self.clusters[class_id.item()].initial_cluster_update(features=class_features)

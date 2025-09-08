@@ -23,6 +23,7 @@ class WandBLogger:
 
     def __init__(self, config: DictConfig):
         try:
+            logging.info(f"Initializing W&B logger...")
             if config.logging.api_key:
                 wandb.login(key=config.logging.api_key)
                 logger.info("Successfully logged in to W&B using API key")
