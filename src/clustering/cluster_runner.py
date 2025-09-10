@@ -1,14 +1,13 @@
 import logging
 import torch
 import torch.nn as nn
-from typing import Dict, List, Optional
+from typing import Dict, List
 from omegaconf import DictConfig
 from src.clustering.streaming_clusterer import StreamingClusterer
 from src.clustering.data_stream import DataStreamSimulator
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 import numpy as np
-from typing import Tuple
 from sklearn.preprocessing import StandardScaler
 import os
 
@@ -20,7 +19,6 @@ def run_streaming_experiment(model: nn.Module, dataset: torch.utils.data.Dataset
         model: Your pretrained model (ViT or DINOv2)
         dataset: Your CIFAR100Dataset instance
         config: Your existing config
-        stream_config: Streaming configuration (uses defaults if None)
     """
 
     # Create streaming clusterer
@@ -40,30 +38,34 @@ def run_streaming_experiment(model: nn.Module, dataset: torch.utils.data.Dataset
     print("STREAMING CLUSTERING EXPERIMENT")
     print("="*60)
 
-    if os.path.exists(f'{config.clustering.clustering_algorithms.name}_extracted_features.pt'):
-        dataset = torch.load(f'{config.clustering.clustering_algorithms.name}_extracted_features.pt')
-        embedded_normalized_dataloader = DataLoader(
-            dataset,
-            batch_size=config.clustering.batch_size,
-            shuffle=config.data.shuffle,
-            num_workers=config.data.num_workers,
-            pin_memory=config.data.pin_memory
-        )
-    else:
-        raw_dataloader = DataLoader(
-            dataset, # dataset is a torch.utils.data.TensorDataset
-            batch_size=config.clustering.batch_size,
-            shuffle=config.data.shuffle,
-            num_workers=config.data.num_workers,
-            pin_memory=config.data.pin_memory
-        )
-        embedded_normalized_dataloader = extract_features(model, raw_dataloader, config.device, config)
+    # Pre-load embeddings of images if available. This is for speed of experiment.
+    # if os.path.exists(f'{config.clustering.clustering_algorithms.name}_extracted_features.pt'):
+    #     logging.info("Existing feature extraction found! Loading extracted features (ETA 4 mins)...")
+    #     dataset = torch.load(f'{config.clustering.clustering_algorithms.name}_extracted_features.pt')
+    #     embedded_normalized_dataloader = DataLoader(
+    #         dataset,
+    #         batch_size=config.clustering.batch_size,
+    #         shuffle=config.data.shuffle,
+    #         num_workers=config.data.num_workers,
+    #         pin_memory=config.data.pin_memory
+    #     )
+    # else:
+    logging.info("NO existing feature extraction found, extracting features...")
+    raw_dataloader = DataLoader(
+        dataset, # dataset is a torch.utils.data.TensorDataset
+        batch_size=config.clustering.batch_size,
+        shuffle=config.data.shuffle,
+        num_workers=config.data.num_workers,
+        pin_memory=config.data.pin_memory
+    )
+    embedded_normalized_dataloader = extract_features(model, raw_dataloader, config.device, config)
 
 
     pbar = tqdm(embedded_normalized_dataloader, total=len(embedded_normalized_dataloader), desc="Streaming...")
     try:
         for _, (embedded_features, targets) in enumerate(pbar):
-            result = clusterer.process_batch(embedded_features, targets) # Process batch through clustering
+            # Run a batch through clustering algorithm.
+            result = clusterer.process_batch(embedded_features, targets)
 
             # Update progress bar
             pbar.set_postfix({

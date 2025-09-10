@@ -125,7 +125,7 @@ class StreamingClusterer:
                 self.clustering_mechanism.learn_one(feat_dict)
                 end_time = time.time()
                 print(f"INTERATION {i+self.samples_seen}: Learn one sample time: {round(end_time - start_time, 2)} secs")
-                print(self.clustering_mechanism.p_micro_clusters)
+                print(f"Num. of micro clusters: {len(self.clustering_mechanism.p_micro_clusters.keys())}")
                 # Get prediction
                 # start_time = time.time()
                 # pred = self.clustering_mechanism.predict_one(feat_dict)

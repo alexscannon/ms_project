@@ -31,6 +31,7 @@ class CIFAR100Dataset():
             ])
 
         elif self.config.model.backbone.name == 'dinov2':
+            # If the experiment is using the DINOv2 model, the images need to be transformed to match the expected input by DINOv2.
             transform = transforms.Compose([
                 transforms.Resize(
                     size=self.config.model.backbone.expected_input_size,
@@ -38,7 +39,10 @@ class CIFAR100Dataset():
                 ),
                 transforms.CenterCrop(size=self.config.model.backbone.center_crop),
                 transforms.ToTensor(),
-                transforms.Normalize(mean=self.config.model.backbone.mean, std=self.config.model.backbone.std),
+                transforms.Normalize(
+                    mean=self.config.model.backbone.mean,
+                    std=self.config.model.backbone.std
+                ),
             ])
 
         else:

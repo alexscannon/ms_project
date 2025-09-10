@@ -13,6 +13,10 @@ from src.loggers.wandb_logger import WandBLogger
 from src.utils import set_seed
 from src.data.cifar100 import CIFAR100Dataset
 from src.clustering.cluster_runner import run_streaming_experiment
+from src.clustering_2.clustering_2 import OnlineClustering
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import numpy as np
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config: DictConfig):
@@ -97,7 +101,65 @@ def main(config: DictConfig):
         dataset = CIFAR100Dataset(config).all_data
         logging.info(f"Successfully loaded dataset...")
 
-        run_streaming_experiment(model, dataset, config)
+        # run_streaming_experiment(model, dataset, config)
+
+        full_dataloader = DataLoader(
+            dataset=dataset,
+            batch_size=config.data.batch_size,
+            shuffle=config.data.shuffle # Shuffle is False to simulate a consistent stream
+        )
+        best_threshold, best_cluster_diff = 0, float('inf')
+
+        model.to(device)
+        model.eval()
+
+        all_embeddings = []
+        with torch.no_grad():
+            for images, _ in tqdm(full_dataloader, desc="Generating Embeddings.."):
+                images = images.to(device)
+                # DINOv2 may return a dictionary, we're interested in the CLS token embeddings
+                output = model(images)
+                embeddings = output.cpu().numpy()
+                all_embeddings.append(embeddings)
+        embeddings = np.concatenate(all_embeddings, axis=0)
+
+        for t in range(4500, 4537, 1):
+            print(f"======================================================================")
+            print(f"======================= Threshold: {t} ===============================")
+            print(f"======================================================================")
+            threshold = t/100
+
+            online_clusterer = OnlineClustering(
+                model=model,
+                dataloader=full_dataloader,
+                embeddings=embeddings,
+                threshold=threshold, # This value requires tuning!
+                branching_factor=50,
+            )
+
+            # This single call will perform the entire simulation as you designed:
+            # - It uses the pre-computed embeddings.
+            # - It learns from the first batch.
+            # - It then iterates through the rest, predicting then updating.
+            final_predictions = online_clusterer.run_online_simulation(
+                model=model, # model is passed again as per your class method signature
+                stream_batch_size=100
+            )
+
+            n_clusters_found = online_clusterer.n_clusters_found
+            true_cluster_diff = abs(n_clusters_found - 100)
+            if true_cluster_diff < best_cluster_diff:
+                best_cluster_diff = true_cluster_diff
+                best_threshold = threshold
+
+
+            print("\n======================= Simulation Summary =======================")
+            print(f"Total samples processed: {len(final_predictions)}")
+
+        print(f"Final number of clusters discovered: {n_clusters_found}")
+        print(f"BEST CLUSTER THRESHOLD FOUND: threshold: {best_threshold}, best cluster diff: +/-{best_cluster_diff}")
+        print(f"======================================================================")
+
 
 
 
