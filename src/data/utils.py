@@ -1,4 +1,10 @@
 
+from typing import Tuple
+from tqdm import tqdm
+import numpy as np
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
 from collections.abc import Sized
 from torch.utils.data import Dataset
 import logging
@@ -37,3 +43,29 @@ class ClassRemappingDataset(Dataset):
     def __len__(self) -> int:
         assert isinstance(self.dataset, Sized)
         return len(self.dataset)
+
+
+def get_embeddings(dataloader: DataLoader, model: nn.Module, device: torch.device) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Extracts all feature embeddings for a given dataset using the provided encoder model.
+
+    Args:
+        dataloader (DataLoader): DataLoader providing batches of input data. Directly passing in dataloader to avoid
+                                    class creation errors.
+    Returns:
+        all_embeddings (np.ndarray): A numpy array containing the extracted embeddings for the entire dataset.
+
+    """
+    model.to(device)
+    model.eval()
+
+    all_embeddings, all_labels = [], []
+    with torch.no_grad():
+        for images, labels in tqdm(dataloader, desc="Generating Embeddings.."):
+            images = images.to(device)
+            output = model(images)
+            embeddings = output.cpu().numpy()
+            all_embeddings.append(embeddings)
+            all_labels.append(labels)
+
+    return np.concatenate(all_embeddings, axis=0), np.concatenate(all_labels, axis=0)

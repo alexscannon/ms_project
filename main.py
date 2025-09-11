@@ -17,6 +17,7 @@ from src.clustering_2.clustering_2 import OnlineClustering
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
+from src.data.utils import get_embeddings
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config: DictConfig):
@@ -109,21 +110,11 @@ def main(config: DictConfig):
             shuffle=config.data.shuffle # Shuffle is False to simulate a consistent stream
         )
         best_threshold, best_cluster_diff = 0, float('inf')
+        best_ari, best_nmi, best_ari_threshold, best_nmi_threshold = 0, 0, 0, 0
 
-        model.to(device)
-        model.eval()
+        embeddings, true_labels = get_embeddings(dataloader=full_dataloader, model=model, device=device)
 
-        all_embeddings = []
-        with torch.no_grad():
-            for images, _ in tqdm(full_dataloader, desc="Generating Embeddings.."):
-                images = images.to(device)
-                # DINOv2 may return a dictionary, we're interested in the CLS token embeddings
-                output = model(images)
-                embeddings = output.cpu().numpy()
-                all_embeddings.append(embeddings)
-        embeddings = np.concatenate(all_embeddings, axis=0)
-
-        for t in range(4500, 4537, 1):
+        for t in range(4500, 4550, 1):
             print(f"======================================================================")
             print(f"======================= Threshold: {t} ===============================")
             print(f"======================================================================")
@@ -133,36 +124,45 @@ def main(config: DictConfig):
                 model=model,
                 dataloader=full_dataloader,
                 embeddings=embeddings,
+                true_labels=true_labels,
                 threshold=threshold, # This value requires tuning!
                 branching_factor=50,
             )
 
-            # This single call will perform the entire simulation as you designed:
-            # - It uses the pre-computed embeddings.
-            # - It learns from the first batch.
-            # - It then iterates through the rest, predicting then updating.
-            final_predictions = online_clusterer.run_online_simulation(
-                model=model, # model is passed again as per your class method signature
+            # Entire simulation: (1.) Uses the pre-computed embeddings (2.) learns from the first batch,
+            # (3.) iterates through the rest, predicting then updating clusters.
+            final_predictions, final_metrics = online_clusterer.run_online_simulation(
                 stream_batch_size=100
             )
 
+            # print(f"Final metrics: {final_metrics}")
+
             n_clusters_found = online_clusterer.n_clusters_found
-            true_cluster_diff = abs(n_clusters_found - 100)
+            true_cluster_diff = abs(n_clusters_found - config.data.num_classes)
+
             if true_cluster_diff < best_cluster_diff:
                 best_cluster_diff = true_cluster_diff
                 best_threshold = threshold
 
+            final_ari = final_metrics['final_ari']
+            final_nmi = final_metrics['final_nmi']
 
-            print("\n======================= Simulation Summary =======================")
-            print(f"Total samples processed: {len(final_predictions)}")
+            if final_ari > best_ari:
+                best_ari = final_ari
+                best_ari_threshold = threshold
+
+            if final_nmi > best_nmi:
+                best_nmi = final_nmi
+                best_nmi_threshold = threshold
+
+            # print("\n======================= Simulation Summary =======================")
+            # print(f"Total samples processed: {len(final_predictions)}")
 
         print(f"Final number of clusters discovered: {n_clusters_found}")
         print(f"BEST CLUSTER THRESHOLD FOUND: threshold: {best_threshold}, best cluster diff: +/-{best_cluster_diff}")
+        print(f"Best ARI {best_ari} with threshold: {best_ari_threshold}")
+        print(f"Best NMI {best_nmi} with threshold: {best_nmi_threshold}")
         print(f"======================================================================")
-
-
-
-
 
 
     wand_logger.finish(exit_code=0)
