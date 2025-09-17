@@ -1,0 +1,22 @@
+version: 1
+disable_existing_loggers: false
+formatters:
+  basic:
+    format: '[%(levelname)s – %(filename)s:%(lineno)d] %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: basic
+    level: DEBUG
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    formatter: basic
+    level: DEBUG
+    filename: msproject.log
+loggers:
+  root:
+    level: DEBUG
+    handlers:
+    - console
+    - file

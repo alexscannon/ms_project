@@ -3,14 +3,13 @@ from sklearn.cluster import Birch
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 import logging
 from typing import Tuple, Dict
 
 from .evaluation import ClusteringEvaluator
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("msproject")
 
 class OnlineClustering:
     """
@@ -48,8 +47,8 @@ class OnlineClustering:
         self.true_labels = true_labels
         self.evaluator = ClusteringEvaluator()
 
-        logging.info(f"BIRCH algorithm initialized (on device: '{self.device}')...")
-        logging.info(f"BIRCH hyperparameters: branching_factor={branching_factor}, threshold={threshold}.")
+        logger.info(f"BIRCH algorithm initialized (on device: '{self.device}')...")
+        logger.info(f"BIRCH hyperparameters: branching_factor={branching_factor}, threshold={threshold}.")
 
     @property
     def n_clusters_found(self) -> int:
@@ -122,7 +121,6 @@ class OnlineClustering:
         all_embeddings = self.embeddings
         all_true_labels = self.true_labels
         num_total_samples = len(all_embeddings)
-        logging.info(f"Starting online simulation on {num_total_samples} embeddings...")
 
         all_predictions = np.zeros(num_total_samples, dtype=int)
 
@@ -132,12 +130,9 @@ class OnlineClustering:
 
         # The labels for the first batch are assigned during the fit
         all_predictions[0:stream_batch_size] = self.clustering_algorithm.labels_
-        logging.info(f"Initial learning complete. Found {self.n_clusters_found} clusters...")
-
 
         # Step 3: Process subsequent batches of embeddings
-        pbar = tqdm(range(stream_batch_size, num_total_samples, stream_batch_size), desc="Processing Stream...")
-        for i in pbar:
+        for i in range(stream_batch_size, num_total_samples, stream_batch_size):
             start_idx = i
             end_idx = min(i + stream_batch_size, num_total_samples)
             current_batch_embeddings = all_embeddings[start_idx:end_idx]
@@ -157,13 +152,9 @@ class OnlineClustering:
                 samples_processed=end_idx
             )
 
-
             # Now, update the model with this new batch
             self.update_clusters(current_batch_embeddings)
 
-        logging.info(f"====================== ONLINE SIMULATION FINISHED ======================")
-        logging.info(f"Final number of clusters: {self.n_clusters_found}")
-        logging.info(f"==================================================================")
         self.evaluator.print_final_summary()
         return all_predictions, self.evaluator.get_final_metrics()
 
@@ -175,7 +166,7 @@ class OnlineClustering:
         """Convenience wrapper to update clusters directly from a dataloader."""
         embeddings = self._get_embeddings(encoder, dataloader)
         self.update_clusters(embeddings)
-        logging.info(f"Cluster update complete. Found {self.n_clusters_found} clusters so far.")
+        logger.info(f"Cluster update complete. Found {self.n_clusters_found} clusters so far.")
 
     def predict_from_dataloader(self, encoder, dataloader):
         """Convenience wrapper to predict clusters directly from a dataloader."""

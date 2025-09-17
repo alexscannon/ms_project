@@ -17,5 +17,7 @@ output_dir: /home/alex/repos/ms_project/results/ # Change this to your own path
 ind_class_ratio: 0.8 # 80% of classes used for IND training data
 ind_example_ratio: 0.75 # 75% of examples used for IND training data
 run_ood_detection: false # Whether to run a pure OOD detection analysis
+embeddings_location: /home/alex/data/embeddings
+logs_location: /home/alex/repos/ms_project/logs
 
 # save_model: false # save the model after training

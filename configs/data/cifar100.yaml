@@ -1,5 +1,6 @@
 name: cifar100
 location: /home/alex/data/
+embeddings_filename: cifar100_embeddings.pth
 
 channels: 3
 image_size: 32

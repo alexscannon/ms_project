@@ -1,4 +1,5 @@
-
+import os
+import traceback
 from typing import Tuple
 from tqdm import tqdm
 import numpy as np
@@ -8,7 +9,11 @@ from torch.utils.data import DataLoader
 from collections.abc import Sized
 from torch.utils.data import Dataset
 import logging
+from sklearn.preprocessing import StandardScaler
+from omegaconf import DictConfig
 
+
+logger = logging.getLogger("msproject")
 
 class ClassRemappingDataset(Dataset):
     """
@@ -29,7 +34,7 @@ class ClassRemappingDataset(Dataset):
         if original_target not in self.class_mapping:
             # This error indicates a mismatch between the data subset and the provided mapping.
             # The subset should only contain samples whose original labels are keys in class_mapping.
-            logging.info(f"class mapping: {self.class_mapping}")
+            logger.info(f"class mapping: {self.class_mapping}")
             raise ValueError(
                 f"Original target {original_target} not found in class_mapping. \n"
                 f"Ensure the input dataset to ClassRemappingDataset only contains samples \n"
@@ -68,4 +73,56 @@ def get_embeddings(dataloader: DataLoader, model: nn.Module, device: torch.devic
             all_embeddings.append(embeddings)
             all_labels.append(labels)
 
-    return np.concatenate(all_embeddings, axis=0), np.concatenate(all_labels, axis=0)
+    all_embeddings_np = np.concatenate(all_embeddings, axis=0)
+    all_labels_np= np.concatenate(all_labels, axis=0)
+
+    # Standarize features
+    logger.info(f"Standardizing embeddings (zero mu, unit sigma)...")
+    scaler = StandardScaler()
+    all_embeddings_scaled = scaler.fit_transform(all_embeddings_np)
+
+    return all_embeddings_scaled, all_labels_np
+
+def load_embeddings(config: DictConfig, model: nn.Module, device: torch.device, full_dataloader: DataLoader) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Returns saved (normalized) embeddings & labels or computes, saves, then returns
+    new (normalized) embeddings & labels.
+
+    Args:
+        config
+        model
+        device
+        full_dataloader
+    Returns:
+
+    """
+    # Location of embeddings file path (.pth format)
+    embeddings_file_path = os.path.join(config.embeddings_location, config.data.embeddings_filename)
+    embeddings, true_labels = None, None
+
+    if os.path.exists(embeddings_file_path):
+        try:
+            logger.info(f"Existing computed and normalized embeddedings...")
+            data_dict = torch.load(embeddings_file_path)
+            # Convert tensors back to np.ndarray for scikit-learn compatability
+            embeddings = data_dict.get('embeddings', torch.empty(0)).numpy()
+            true_labels = data_dict.get('true_labels', torch.empty(0)).numpy()
+        except Exception as e:
+            logger.info(f"[ERROR] Failed to load saved embedding data. ({type(e).__name__}: {e})")
+            traceback.print_exc()
+    else:
+        try:
+            logger.info(f"No existing embeddedings found...")
+            embeddings, true_labels = get_embeddings(dataloader=full_dataloader, model=model, device=device)
+            logger.info(f"Saving normalized embeddings at path: {embeddings_file_path}")
+            data = {
+                "embeddings": torch.from_numpy(embeddings),
+                "true_labels": torch.from_numpy(true_labels),
+            }
+            torch.save(data, embeddings_file_path)
+            logger.info("Successfully created and saved embeddings data...")
+        except Exception as e:
+            logger.info(f"[ERROR] Failed to create or save embedding data. ({type(e).__name__}: {e})")
+            traceback.print_exc()
+
+    return embeddings, true_labels

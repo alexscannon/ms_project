@@ -3,6 +3,7 @@ import random
 import logging
 import torch
 import numpy as np
+import yaml
 
 from typing import Dict, List, Optional, Tuple
 from torch import device as TorchDevice
@@ -10,6 +11,33 @@ from torch import version
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig
 from sklearn.metrics import roc_curve, auc
+import time
+from dotenv import load_dotenv
+
+logger = logging.getLogger("msproject")
+
+def setup_experiment(config: DictConfig):
+    load_dotenv()
+    setup_logging(config)
+    set_seed(config.seed)
+    logger.info(f"Successfully loaded project configuration...")
+    # logger.info(f"Loaded Configuration: {OmegaConf.to_yaml(config)}")
+
+def setup_logging(global_config: DictConfig):
+    # Load logging configuration
+    logging_config_location = "/home/alex/repos/ms_project/configs/logging/logger.yaml"
+    with open(logging_config_location) as f_in:
+        logging_config = yaml.safe_load(f_in)
+
+
+    # Create logs directory if it doesn't exist
+    os.makedirs(global_config.logs_location, exist_ok=True)
+    # Set log filename
+    log_filename = os.path.join(global_config.logs_location, f"msproject_{time.strftime('%Y%m%d_%H%M%S')}.log")
+    logging_config['handlers']['file']['filename'] = os.path.join(global_config.logs_location, log_filename)
+
+    logging.config.dictConfig(logging_config)
+
 
 def set_seed(seed: int = 42) -> None:
     """
@@ -31,11 +59,27 @@ def set_seed(seed: int = 42) -> None:
         torch.backends.cudnn.benchmark = False  # Disable benchmarking for reproducibility
 
     # Document the environment for future reproducibility
-    logging.info(f"PyTorch version: {torch.__version__}")
-    logging.info(f"CUDA version: {version.cuda if torch.cuda.is_available() else 'N/A'}")
+    logger.info(f"PyTorch version: {torch.__version__}")
+    logger.info(f"CUDA version: {version.cuda if torch.cuda.is_available() else 'N/A'}")
 
-    logging.info(f"Random seed set to {seed} for reproducibility.")
+    logger.info(f"Random seed set to {seed} for reproducibility.")
 
+def get_device(config: DictConfig) -> torch.device:
+    """
+    Get the device to use for the experiment.
+    Args:
+        config (DictConfig): Configuration object
+    Returns:
+        device (torch.device): Device to use for the experiment
+    """
+    if torch.cuda.is_available() and hasattr(config, 'device') and config.device == "gpu":
+            device = torch.device(config.device)
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+    logger.info(f"Using device: {device} ...")
+    return device
 
 def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: TorchDevice) -> dict:
     """
@@ -61,7 +105,7 @@ def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: TorchDevi
         }
     """
     # Only CIFAR-100 has a separate checkpoint directory
-    logging.info(f"Loading checkpoint for {dataset_name} dataset...")
+    logger.info(f"Loading checkpoint for {dataset_name} dataset...")
     if dataset_name == 'cifar100':
         checkpoint_path = config.model.backbone.cifar100_location
     elif dataset_name == 'tiny_imagenet':
@@ -70,15 +114,15 @@ def get_checkpoint_dict(dataset_name: str, config: DictConfig, device: TorchDevi
         raise NotImplementedError(f"[Error] Checkpoint data not supported for {dataset_name}")
 
     if not os.path.exists(checkpoint_path):
-        logging.error(f"Checkpoint file not found at {checkpoint_path}")
+        logger.error(f"Checkpoint file not found at {checkpoint_path}")
         raise FileNotFoundError(f"Checkpoint file not found at {checkpoint_path}")
 
     # --- Load Checkpoint ---
     try:
         checkpoint_data = torch.load(checkpoint_path, map_location=device, weights_only=False) # Load directly to target device if possible
-        logging.info(f"Successfully loaded checkpoint from {checkpoint_path}")
+        logger.info(f"Successfully loaded checkpoint from {checkpoint_path}")
     except Exception as e:
-        logging.error(f"Failed to load checkpoint from {checkpoint_path}: {e}")
+        logger.error(f"Failed to load checkpoint from {checkpoint_path}: {e}")
 
     return checkpoint_data
 
@@ -131,7 +175,7 @@ def plot_roc_curves(
     for i, detector_name in enumerate(detector_names):
         score_key = detector_mapping.get(detector_name)
         if score_key is None:
-            logging.warning(f"Unknown detector: {detector_name}. Skipping.")
+            logger.warning(f"Unknown detector: {detector_name}. Skipping.")
             continue
 
         # Get scores for ID and OOD data
@@ -139,12 +183,12 @@ def plot_roc_curves(
         ood_scores_tensor = ood_stats.get(score_key)
 
         if ind_scores_tensor is None or ood_scores_tensor is None:
-            logging.warning(f"Scores for '{detector_name}' not found in one or both datasets. Skipping.")
+            logger.warning(f"Scores for '{detector_name}' not found in one or both datasets. Skipping.")
             aurocs[detector_name] = np.nan
             continue
 
         if not isinstance(ind_scores_tensor, torch.Tensor) or not isinstance(ood_scores_tensor, torch.Tensor):
-            logging.warning(f"Scores for '{detector_name}' are not tensors. Skipping.")
+            logger.warning(f"Scores for '{detector_name}' are not tensors. Skipping.")
             aurocs[detector_name] = np.nan
             continue
 
@@ -174,7 +218,7 @@ def plot_roc_curves(
                     label=f'{detector_name.upper()} (AUROC = {roc_auc:.3f})')
 
         except ValueError as e:
-            logging.error(f"ROC calculation failed for {detector_name}: {e}")
+            logger.error(f"ROC calculation failed for {detector_name}: {e}")
             aurocs[detector_name] = np.nan
 
     # Plot diagonal line (random classifier)
@@ -203,7 +247,7 @@ def plot_roc_curves(
     # Save plot if path is provided
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        logging.info(f"ROC curves saved to {save_path}")
+        logger.info(f"ROC curves saved to {save_path}")
 
     # Show plot if requested
     if show_plot:
@@ -264,7 +308,7 @@ def plot_single_roc_curve(
 
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        logging.info(f"ROC curve saved to {save_path}")
+        logger.info(f"ROC curve saved to {save_path}")
 
     if show_plot:
         plt.show()

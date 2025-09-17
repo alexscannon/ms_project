@@ -3,6 +3,8 @@ from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 import logging
 from collections import defaultdict
 
+logger = logging.getLogger("msproject")
+
 class ClusteringEvaluator:
     """
     A class to handle the evaluation of a clustering model over time.
@@ -18,7 +20,7 @@ class ClusteringEvaluator:
         }
         self.running_predictions, self.running_true_labels = [], []
         self.clusters = defaultdict(list)
-        logging.info("ClusteringEvaluator initialized.")
+        logger.info("ClusteringEvaluator initialized.")
 
     def evaluate_and_log(self, curr_true_labels: np.ndarray, curr_predictions: np.ndarray, n_clusters: int, samples_processed: int):
         """
@@ -34,7 +36,7 @@ class ClusteringEvaluator:
             samples_processed (int): The total number of samples processed.
         """
         if len(curr_true_labels) != len(curr_predictions):
-            logging.error("Mismatch between number of true labels and predictions. Cannot evaluate.")
+            logger.error("Mismatch between number of true labels and predictions. Cannot evaluate.")
             return
 
         self.running_predictions.extend(curr_predictions)
@@ -45,8 +47,17 @@ class ClusteringEvaluator:
         for c in np.unique(curr_predictions):
             self.clusters[c].extend(curr_true_labels[curr_predictions == c].tolist())
 
-        ari_score = adjusted_rand_score(self.running_true_labels, self.running_predictions)
-        nmi_score = normalized_mutual_info_score(self.running_true_labels, self.running_predictions)
+        num_running_samples = len(self.running_true_labels)
+        num_unique_labels = len(np.unique(self.running_true_labels))
+
+        if num_running_samples < 2 * num_unique_labels or num_unique_labels < 2:
+            # Not enough data for a meaningful evaluation, so we skip it.
+            # We'll still record the number of clusters and samples processed.
+            ari_score = 0.0
+            nmi_score = 0.0
+        else:
+            ari_score = adjusted_rand_score(self.running_true_labels, self.running_predictions)
+            nmi_score = normalized_mutual_info_score(self.running_true_labels, self.running_predictions)
 
         self.metrics_history['samples_processed'].append(samples_processed)
         self.metrics_history['ari'].append(ari_score)
@@ -71,9 +82,9 @@ class ClusteringEvaluator:
         """
         final_metrics = self.get_final_metrics()
         if final_metrics:
-            print("\n--- Final Clustering Evaluation ---")
-            print(f"Adjusted Rand Index (ARI): {final_metrics['final_ari']:.4f}")
-            print(f"Normalized Mutual Information (NMI): {final_metrics['final_nmi']:.4f}")
-            print(f"Final number of clusters discovered: {final_metrics['final_n_clusters']}")
+            logger.info("--------- Final Clustering Evaluation ---------")
+            logger.info(f"Adjusted Rand Index (ARI): {final_metrics['final_ari']:.4f}")
+            logger.info(f"Normalized Mutual Information (NMI): {final_metrics['final_nmi']:.4f}")
+            logger.info(f"Final number of clusters discovered: {final_metrics['final_n_clusters']}\n")
         else:
-            print("No evaluation metrics were recorded.")
+            logger.info("No evaluation metrics were recorded.")

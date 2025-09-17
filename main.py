@@ -1,46 +1,34 @@
 import hydra
-from omegaconf import DictConfig, OmegaConf
-import torch
+from omegaconf import DictConfig
 import logging
-from dotenv import load_dotenv
-
 from src.models.backbone.create_model import create_model
 from src.data.dataset_loader import dataload
-from src.utils import get_checkpoint_dict
+from src.utils import get_checkpoint_dict, get_device
 from src.models.ood.ood_detector import OODDetector
 from src.models.continual_learning.CL import ContinualLearning
 from src.loggers.wandb_logger import WandBLogger
-from src.utils import set_seed
+from src.utils import setup_experiment
 from src.data.cifar100 import CIFAR100Dataset
 from src.clustering.cluster_runner import run_streaming_experiment
 from src.clustering_2.clustering_2 import OnlineClustering
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import numpy as np
-from src.data.utils import get_embeddings
+from src.data.utils import load_embeddings
+import time
+
+logger = logging.getLogger("msproject")
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(config: DictConfig):
-    # logging.info(f"Loaded Configuration: {OmegaConf.to_yaml(config)}")
-    load_dotenv()
-    logging.info(f"Loaded Configuration...")
-
     # ============================ Experiment setup ============================ #
-    # Set random seed for reproducibility
-    set_seed(config.seed)
+    # Load config + set up logger + set random seed (reproducibility)
+    setup_experiment(config)
 
-    # Determine device
-    if torch.cuda.is_available() and hasattr(config, 'device') and config.device == "gpu":
-        device = torch.device(config.device)
-    elif torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-    logging.info(f"Using device: {device} ...")
+    # Determine and set experiment's device
+    device = get_device(config)
 
     # Initialize logging
     wand_logger = WandBLogger(config)
-
 
     # ============================ Load pre-trained model ============================ #
     # Create new non-pretrained ViT model
@@ -52,11 +40,11 @@ def main(config: DictConfig):
 
     # load model weights if there exists pretrained weights.
     if config.model.pretrained and config.model.backbone.name == 'vit':
-        logging.info("Loading pre-trained Vision Transformer model...")
+        logger.info("Loading pre-trained Vision Transformer model...")
         checkpoint_data = get_checkpoint_dict(config.data.name, config, device)
 
-        logging.info(f"checkpoint_data attributes: {checkpoint_data.keys()}")
-        logging.info(f"checkpoint_data['class_info'] attributes: {list(checkpoint_data['class_info'].keys())}")
+        logger.info(f"checkpoint_data attributes: {checkpoint_data.keys()}")
+        logger.info(f"checkpoint_data['class_info'] attributes: {list(checkpoint_data['class_info'].keys())}")
         model.load_state_dict(checkpoint_data["model_state_dict"])
 
     # ======================================================== #
@@ -65,22 +53,22 @@ def main(config: DictConfig):
     if config.is_old_experiment:
         # ============================ Dataset Loading ============================ #
         # Load remaining ID and OOD datasets
-        logging.info("Loading left-out IND, OOD, and Corrupted datasets...")
+        logger.info("Loading left-out IND, OOD, and Corrupted datasets...")
         left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader, corrupted_dataloader = dataload(config, checkpoint_data)
 
         # ============================ OOD detection ============================ #
         # Create OOD detector
-        logging.info("Creating OOD detector...")
+        logger.info("Creating OOD detector...")
         ood_detector = OODDetector(config, model, left_in_ind_dataloader, device)
 
         # Run OOD detection
-        # logging.info("Running OOD detection...")
+        # logger.info("Running OOD detection...")
         # aurocs = ood_detector.run_ood_detection(left_in_ind_dataloader, left_out_ind_dataloader, ood_dataloader)
         # formatted_aurocs = {k: f"{v * 100:.2f}%" for k, v in aurocs.items()}
-        # logging.info(f"AUROCs: {formatted_aurocs}")
+        # logger.info(f"AUROCs: {formatted_aurocs}")
 
         # ============================ Continual Learning ============================ #
-        logging.info("Running Continual Learning scenario...")
+        logger.info("Running Continual Learning scenario...")
         continual_learning = ContinualLearning(
             config=config, model=model, device=device, left_in_dataloader=left_in_ind_dataloader
         )
@@ -94,13 +82,12 @@ def main(config: DictConfig):
             checkpoint_class_info=checkpoint_data["class_info"],
             corrupted_dataloader=corrupted_dataloader
         )
-    # ======================================================== #
+
     # ==================== NEW EXPERIMENT ==================== #
-    # ======================================================== #
     else:
-        logging.info(f"Loading dataset: {config.data.name}...")
+        logger.info(f"Loading dataset: {config.data.name}...")
         dataset = CIFAR100Dataset(config).all_data
-        logging.info(f"Successfully loaded dataset...")
+        logger.info(f"Successfully loaded dataset...")
 
         # run_streaming_experiment(model, dataset, config)
 
@@ -109,16 +96,20 @@ def main(config: DictConfig):
             batch_size=config.data.batch_size,
             shuffle=config.data.shuffle # Shuffle is False to simulate a consistent stream
         )
+
+        embeddings, true_labels = load_embeddings(config, model, device, full_dataloader)
+
         best_threshold, best_cluster_diff = 0, float('inf')
         best_ari, best_nmi, best_ari_threshold, best_nmi_threshold = 0, 0, 0, 0
+        pbar = tqdm(range(2700, 2770, 1), desc="Processing Stream...")
+        for idx, t in enumerate(pbar):
+            start_time = time.time()
+            threshold = t / 100
+            # threshold = t / 100 or something
 
-        embeddings, true_labels = get_embeddings(dataloader=full_dataloader, model=model, device=device)
-
-        for t in range(4500, 4550, 1):
-            print(f"======================================================================")
-            print(f"======================= Threshold: {t} ===============================")
-            print(f"======================================================================")
-            threshold = t/100
+            logger.info(f"======================================================================")
+            logger.info(f"======================= Threshold: {threshold} ===============================")
+            logger.info(f"======================================================================")
 
             online_clusterer = OnlineClustering(
                 model=model,
@@ -135,35 +126,39 @@ def main(config: DictConfig):
                 stream_batch_size=100
             )
 
-            # print(f"Final metrics: {final_metrics}")
-
             n_clusters_found = online_clusterer.n_clusters_found
             true_cluster_diff = abs(n_clusters_found - config.data.num_classes)
-
-            if true_cluster_diff < best_cluster_diff:
-                best_cluster_diff = true_cluster_diff
-                best_threshold = threshold
 
             final_ari = final_metrics['final_ari']
             final_nmi = final_metrics['final_nmi']
 
+            if true_cluster_diff < best_cluster_diff:
+                logger.info(f"NEW BEST CLUSTER DIFF – diff +/-{true_cluster_diff} (Threshold: {threshold})")
+                best_cluster_diff = true_cluster_diff
+                best_threshold = threshold
+
             if final_ari > best_ari:
+                logger.info(f"NEW BEST ARI – {final_ari} (Threshold: {threshold})")
                 best_ari = final_ari
                 best_ari_threshold = threshold
 
             if final_nmi > best_nmi:
+                logger.info(f"NEW BEST NMI – {final_nmi} (Threshold: {threshold})")
                 best_nmi = final_nmi
                 best_nmi_threshold = threshold
 
-            # print("\n======================= Simulation Summary =======================")
-            # print(f"Total samples processed: {len(final_predictions)}")
+            end_time = time.time()
+            logger.info(f"Run #{idx} duration: {end_time - start_time} seconds")
 
-        print(f"Final number of clusters discovered: {n_clusters_found}")
-        print(f"BEST CLUSTER THRESHOLD FOUND: threshold: {best_threshold}, best cluster diff: +/-{best_cluster_diff}")
-        print(f"Best ARI {best_ari} with threshold: {best_ari_threshold}")
-        print(f"Best NMI {best_nmi} with threshold: {best_nmi_threshold}")
-        print(f"======================================================================")
+            # logger.info("\n======================= Simulation Summary =======================")
+            # logger.info(f"Total samples processed: {len(final_predictions)}")
 
+        logger.info(f"======================================================================")
+        # logger.info(f"Final number of clusters discovered: {n_clusters_found}")
+        logger.info(f"Best cluster diff: +/-{best_cluster_diff}. Threshold: {best_threshold}")
+        logger.info(f"Best ARI {best_ari}. Threshold: {best_ari_threshold}")
+        logger.info(f"Best NMI {best_nmi}. Threshold: {best_nmi_threshold}")
+        logger.info(f"======================================================================")
 
     wand_logger.finish(exit_code=0)
 

@@ -2,9 +2,10 @@ from omegaconf import DictConfig
 import logging
 from .vit import ViT
 from .DINOv2 import load_dinov2_model
+logger = logging.getLogger("msproject")
 
 def create_model(img_size: int, n_classes: int, config: DictConfig):
-    logging.info(f"Creating **{config.model.backbone.name}** model...")
+    logger.info(f"Creating ** {config.model.backbone.name} ** model...")
 
     if config.model.backbone.name == 'vit':
         patch_size = 4 if img_size == 32 else 8
@@ -27,5 +28,5 @@ def create_model(img_size: int, n_classes: int, config: DictConfig):
     elif config.model.backbone.name == 'dinov2':
         model = load_dinov2_model(model_size=config.model.backbone.model_size, device=config.device)
 
-    logging.info(f"Successfully created model...")
+    logger.info(f"Successfully created model...")
     return model
