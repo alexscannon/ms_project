@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from src.data.utils import load_embeddings
 import time
+from src.utils import visualize_clusters
 
 logger = logging.getLogger("msproject")
 
@@ -101,7 +102,7 @@ def main(config: DictConfig):
 
         best_threshold, best_cluster_diff = 0, float('inf')
         best_ari, best_nmi, best_ari_threshold, best_nmi_threshold = 0, 0, 0, 0
-        pbar = tqdm(range(2700, 2770, 1), desc="Processing Stream...")
+        pbar = tqdm(range(2530, 3000, 1), desc="Processing Stream...")
         for idx, t in enumerate(pbar):
             start_time = time.time()
             threshold = t / 100
@@ -116,7 +117,7 @@ def main(config: DictConfig):
                 dataloader=full_dataloader,
                 embeddings=embeddings,
                 true_labels=true_labels,
-                threshold=threshold, # This value requires tuning!
+                threshold=threshold,
                 branching_factor=50,
             )
 
@@ -133,17 +134,20 @@ def main(config: DictConfig):
             final_nmi = final_metrics['final_nmi']
 
             if true_cluster_diff < best_cluster_diff:
+                best_cluster_diff_labels = final_predictions
                 logger.info(f"NEW BEST CLUSTER DIFF – diff +/-{true_cluster_diff} (Threshold: {threshold})")
                 best_cluster_diff = true_cluster_diff
                 best_threshold = threshold
 
             if final_ari > best_ari:
                 logger.info(f"NEW BEST ARI – {final_ari} (Threshold: {threshold})")
+                best_ari_labels = final_predictions
                 best_ari = final_ari
                 best_ari_threshold = threshold
 
             if final_nmi > best_nmi:
                 logger.info(f"NEW BEST NMI – {final_nmi} (Threshold: {threshold})")
+                best_nmi_labels = final_predictions
                 best_nmi = final_nmi
                 best_nmi_threshold = threshold
 
@@ -159,7 +163,27 @@ def main(config: DictConfig):
         logger.info(f"Best ARI {best_ari}. Threshold: {best_ari_threshold}")
         logger.info(f"Best NMI {best_nmi}. Threshold: {best_nmi_threshold}")
         logger.info(f"======================================================================")
-
+        visualize_clusters(
+            embeddings,
+            best_cluster_diff_labels,
+            save_path="visuals/best_cluster/birch_clustering_results.png",
+            title=f"BIRCH Clustering (Best Cluster Diff)\nThreshold: {best_threshold}",
+            show_plot=True # Set to True if you want to see the plot interactively
+        )
+        visualize_clusters(
+            embeddings,
+            best_ari_labels,
+            save_path="visuals/best_ari/birch_clustering_results.png",
+            title=f"BIRCH Clustering (Best ARI)\nThreshold: {best_ari_threshold}",
+            show_plot=True # Set to True if you want to see the plot interactively
+        )
+        visualize_clusters(
+            embeddings,
+            best_nmi_labels,
+            save_path="visuals/best_nmi/birch_clustering_results.png",
+            title=f"BIRCH Clustering (Best NMI)\nThreshold: {best_nmi_threshold}",
+            show_plot=True # Set to True if you want to see the plot interactively
+        )
     wand_logger.finish(exit_code=0)
 
 

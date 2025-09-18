@@ -8,3 +8,4 @@ wandb/
 **/__pycache__/
 
 denstream_extracted_features.pt
+visuals/

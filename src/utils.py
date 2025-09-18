@@ -4,7 +4,9 @@ import logging
 import torch
 import numpy as np
 import yaml
-
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
+import seaborn as sns
 from typing import Dict, List, Optional, Tuple
 from torch import device as TorchDevice
 from torch import version
@@ -314,3 +316,71 @@ def plot_single_roc_curve(
         plt.show()
 
     return float(roc_auc)
+
+
+def visualize_clusters(
+    embeddings,
+    cluster_labels,
+    save_path: Optional[str] = None,
+    title: str = 't-SNE Visualization of Clusters',
+    show_plot: bool = True
+):
+    """
+    Visualizes high-dimensional clusters using t-SNE.
+
+    Args:
+        embeddings (np.ndarray or torch.Tensor): The high-dimensional data points.
+        cluster_labels (np.ndarray): The cluster label for each data point.
+        save_path (Optional[str], optional): Path to save the plot. Defaults to None.
+        title (str, optional): Title for the plot.
+        show_plot (bool, optional): Whether to display the plot. Defaults to True.
+    """
+    # 1. Reduce dimensionality with t-SNE
+    logger.info("Performing t-SNE for visualization...")
+
+    if isinstance(embeddings, torch.Tensor):
+        embeddings = embeddings.cpu().numpy()
+
+    tsne = TSNE(
+        n_components=2,
+        perplexity=30,
+        max_iter=1000,
+        random_state=42,
+        n_jobs=-1
+    )
+    embeddings_2d = tsne.fit_transform(embeddings)
+    logger.info("t-SNE finished.")
+
+    # 2. Create a scatter plot
+    plt.figure(figsize=(12, 10))
+
+    # Use seaborn for a nice color palette
+    unique_labels = np.unique(cluster_labels)
+    palette = sns.color_palette("hsv", len(unique_labels))
+
+    sns.scatterplot(
+        x=embeddings_2d[:, 0],
+        y=embeddings_2d[:, 1],
+        hue=cluster_labels,
+        palette=palette,
+        legend="full",
+        s=50,  # marker size
+        alpha=0.7
+    )
+
+    plt.title(title)
+    plt.xlabel('t-SNE dimension 1')
+    plt.ylabel('t-SNE dimension 2')
+    plt.legend(title='Cluster ID', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+
+    # Save plot if path is provided
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        logger.info(f"Cluster visualization saved to {save_path}")
+
+    # Show plot if requested
+    if show_plot:
+        plt.show()
+
+    plt.close() # Close the figure to free up memory
