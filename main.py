@@ -14,6 +14,7 @@ from src.clustering_2.clustering_2 import OnlineClustering
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from src.data.utils import load_embeddings
+from datetime import datetime
 import time
 from src.utils import visualize_clusters
 
@@ -102,10 +103,12 @@ def main(config: DictConfig):
 
         best_threshold, best_cluster_diff = 0, float('inf')
         best_ari, best_nmi, best_ari_threshold, best_nmi_threshold = 0, 0, 0, 0
-        pbar = tqdm(range(2530, 3000, 1), desc="Processing Stream...")
+        list_of_best_thresholds = [25.74, 26.09, 27.39]
+        # pbar = tqdm(range(2530, 3000, 1), desc="Processing Stream...")
+        pbar = tqdm(list_of_best_thresholds, desc="Processing Stream...")
         for idx, t in enumerate(pbar):
             start_time = time.time()
-            threshold = t / 100
+            threshold = t
             # threshold = t / 100 or something
 
             logger.info(f"======================================================================")
@@ -163,27 +166,29 @@ def main(config: DictConfig):
         logger.info(f"Best ARI {best_ari}. Threshold: {best_ari_threshold}")
         logger.info(f"Best NMI {best_nmi}. Threshold: {best_nmi_threshold}")
         logger.info(f"======================================================================")
+
+        date_string = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        save_paths = [
+            f"visuals/best_cluster/birch_clustering_results_{date_string}.png",
+            f"visuals/best_ari/birch_clustering_results_{date_string}.png",
+            f"visuals/best_nmi/birch_clustering_results_{date_string}.png"
+        ]
+        titles = [
+            f"BIRCH Clustering (Best Cluster Diff)\nThreshold: {best_threshold}",
+            f"BIRCH Clustering (Best ARI)\nThreshold: {best_ari_threshold}",
+            f"BIRCH Clustering (Best NMI)\nThreshold: {best_nmi_threshold}"
+        ]
+        labels = [best_cluster_diff_labels, best_ari_labels, best_nmi_labels]
+
         visualize_clusters(
             embeddings,
-            best_cluster_diff_labels,
-            save_path="visuals/best_cluster/birch_clustering_results.png",
-            title=f"BIRCH Clustering (Best Cluster Diff)\nThreshold: {best_threshold}",
+            labels=labels,
+            save_paths=save_paths,
+            titles=titles,
             show_plot=True # Set to True if you want to see the plot interactively
         )
-        visualize_clusters(
-            embeddings,
-            best_ari_labels,
-            save_path="visuals/best_ari/birch_clustering_results.png",
-            title=f"BIRCH Clustering (Best ARI)\nThreshold: {best_ari_threshold}",
-            show_plot=True # Set to True if you want to see the plot interactively
-        )
-        visualize_clusters(
-            embeddings,
-            best_nmi_labels,
-            save_path="visuals/best_nmi/birch_clustering_results.png",
-            title=f"BIRCH Clustering (Best NMI)\nThreshold: {best_nmi_threshold}",
-            show_plot=True # Set to True if you want to see the plot interactively
-        )
+
     wand_logger.finish(exit_code=0)
 
 

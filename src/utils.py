@@ -319,10 +319,10 @@ def plot_single_roc_curve(
 
 
 def visualize_clusters(
-    embeddings,
-    cluster_labels,
-    save_path: Optional[str] = None,
-    title: str = 't-SNE Visualization of Clusters',
+    embeddings: np.ndarray,
+    labels: List,
+    save_paths: List,
+    titles: List,
     show_plot: bool = True
 ):
     """
@@ -330,9 +330,9 @@ def visualize_clusters(
 
     Args:
         embeddings (np.ndarray or torch.Tensor): The high-dimensional data points.
-        cluster_labels (np.ndarray): The cluster label for each data point.
+        labels (np.ndarray): The cluster label for each data point.
         save_path (Optional[str], optional): Path to save the plot. Defaults to None.
-        title (str, optional): Title for the plot.
+        titles (List, optional): Titles for the plots.
         show_plot (bool, optional): Whether to display the plot. Defaults to True.
     """
     # 1. Reduce dimensionality with t-SNE
@@ -351,36 +351,39 @@ def visualize_clusters(
     embeddings_2d = tsne.fit_transform(embeddings)
     logger.info("t-SNE finished.")
 
-    # 2. Create a scatter plot
-    plt.figure(figsize=(12, 10))
+    for label_set, save_path, title in zip(labels, save_paths, titles):
+        # 2. Create a scatter plot
+        plt.figure(figsize=(12, 10))
 
-    # Use seaborn for a nice color palette
-    unique_labels = np.unique(cluster_labels)
-    palette = sns.color_palette("hsv", len(unique_labels))
+        # Use seaborn for a nice color palette
+        unique_labels = np.unique(label_set)
+        palette = sns.color_palette("hls", len(unique_labels))
 
-    sns.scatterplot(
-        x=embeddings_2d[:, 0],
-        y=embeddings_2d[:, 1],
-        hue=cluster_labels,
-        palette=palette,
-        legend="full",
-        s=50,  # marker size
-        alpha=0.7
-    )
+        sns.scatterplot(
+            x=embeddings_2d[:, 0],
+            y=embeddings_2d[:, 1],
+            hue=label_set,
+            palette=palette,
+            legend="full",
+            s=35,  # marker size
+            alpha=0.7,
+            edgecolor='black',  # Adds a border to each point
+            linewidth=0.35
+        )
 
-    plt.title(title)
-    plt.xlabel('t-SNE dimension 1')
-    plt.ylabel('t-SNE dimension 2')
-    plt.legend(title='Cluster ID', bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.tight_layout()
+        plt.title(title)
+        plt.xlabel('t-SNE dimension 1')
+        plt.ylabel('t-SNE dimension 2')
+        plt.legend(title='Cluster ID', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
 
-    # Save plot if path is provided
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        logger.info(f"Cluster visualization saved to {save_path}")
+        # Save plot if path is provided
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            logger.info(f"Cluster visualization saved to {save_path}")
 
-    # Show plot if requested
-    if show_plot:
-        plt.show()
+        # Show plot if requested
+        if show_plot:
+            plt.show()
 
-    plt.close() # Close the figure to free up memory
+        plt.close() # Close the figure to free up memory
