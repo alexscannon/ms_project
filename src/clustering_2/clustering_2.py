@@ -45,7 +45,7 @@ class OnlineClustering:
         # self.embeddings = self._get_embeddings(dataloader)
         self.embeddings = embeddings
         self.true_labels = true_labels
-        self.evaluator = ClusteringEvaluator()
+        self.evaluator = ClusteringEvaluator(self.clustering_algorithm)
 
         logger.info(f"BIRCH algorithm initialized (on device: '{self.device}')...")
         logger.info(f"BIRCH hyperparameters: branching_factor={branching_factor}, threshold={threshold}.")
@@ -151,6 +151,8 @@ class OnlineClustering:
                 n_clusters=self.n_clusters_found,
                 samples_processed=end_idx
             )
+
+            self.evaluator.evaluate_running_metrics(current_embeddings=current_batch_embeddings, n_clusters=self.n_clusters_found)
 
             # Now, update the model with this new batch
             self.update_clusters(current_batch_embeddings)

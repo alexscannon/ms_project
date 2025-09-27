@@ -11,15 +11,24 @@ class ClusteringEvaluator:
     It stores the history of the evaluation metrics.
     """
 
-    def __init__(self):
+    def __init__(self, clustering_algorithm):
         self.metrics_history = {
             'samples_processed': [],
             'ari': [],
             'nmi': [],
-            'n_clusters': []
+            'n_clusters': [],
+            'running_ari': [],
+            'running_nmi': [],
+            'running_pred_cluster_counts': [],
+            'running_true_cluster_counts': []
         }
-        self.running_predictions, self.running_true_labels = [], []
+        self.clustering_algorithm = clustering_algorithm
+        self.running_embeddings = []
+        self.running_true_labels = []
+        self.running_predictions = []
+
         self.clusters = defaultdict(list)
+
         logger.info("ClusteringEvaluator initialized.")
 
     def evaluate_and_log(self, curr_true_labels: np.ndarray, curr_predictions: np.ndarray, n_clusters: int, samples_processed: int):
@@ -74,6 +83,10 @@ class ClusteringEvaluator:
             'final_ari': self.metrics_history['ari'][-1],
             'final_nmi': self.metrics_history['nmi'][-1],
             'final_n_clusters': self.metrics_history['n_clusters'][-1],
+            'running_ari': self.metrics_history['running_ari'],
+            'running_nmi': self.metrics_history['running_nmi'],
+            'running_pred_cluster_counts': self.metrics_history['running_pred_cluster_counts'],
+            'running_true_cluster_counts': self.metrics_history['running_true_cluster_counts']
         }
 
     def print_final_summary(self):
@@ -88,3 +101,17 @@ class ClusteringEvaluator:
             logger.info(f"Final number of clusters discovered: {final_metrics['final_n_clusters']}\n")
         else:
             logger.info("No evaluation metrics were recorded.")
+
+    def evaluate_running_metrics(self, current_embeddings: np.ndarray, n_clusters: int):
+        """
+        Re-predicts the clusters with the current model state.
+        Args:
+            current_embeddings (np.ndarray): The current embeddings to predict.
+        """
+        self.running_embeddings.extend(current_embeddings)
+        cuurent_total_predictions = self.clustering_algorithm.predict(self.running_embeddings)
+
+        self.metrics_history['running_ari'].append(adjusted_rand_score(self.running_true_labels, cuurent_total_predictions))
+        self.metrics_history['running_nmi'].append(normalized_mutual_info_score(self.running_true_labels, cuurent_total_predictions))
+        self.metrics_history['running_pred_cluster_counts'].append(n_clusters)
+        self.metrics_history['running_true_cluster_counts'].append(len(set(self.running_true_labels)))

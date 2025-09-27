@@ -103,7 +103,10 @@ def main(config: DictConfig):
 
         best_threshold, best_cluster_diff = 0, float('inf')
         best_ari, best_nmi, best_ari_threshold, best_nmi_threshold = 0, 0, 0, 0
+        best_ari_running_metrics, best_nmi_running_metrics, best_cluster_running_metrics = {}, {}, {}
+
         list_of_best_thresholds = [25.74, 26.09, 27.39]
+
         # pbar = tqdm(range(2530, 3000, 1), desc="Processing Stream...")
         pbar = tqdm(list_of_best_thresholds, desc="Processing Stream...")
         for idx, t in enumerate(pbar):
@@ -126,9 +129,9 @@ def main(config: DictConfig):
 
             # Entire simulation: (1.) Uses the pre-computed embeddings (2.) learns from the first batch,
             # (3.) iterates through the rest, predicting then updating clusters.
-            final_predictions, final_metrics = online_clusterer.run_online_simulation(
-                stream_batch_size=100
-            )
+            final_predictions, final_metrics = online_clusterer.run_online_simulation(stream_batch_size=100)
+
+
 
             n_clusters_found = online_clusterer.n_clusters_found
             true_cluster_diff = abs(n_clusters_found - config.data.num_classes)
@@ -136,23 +139,47 @@ def main(config: DictConfig):
             final_ari = final_metrics['final_ari']
             final_nmi = final_metrics['final_nmi']
 
+            running_ari = final_metrics['running_ari']
+            running_nmi = final_metrics['running_nmi']
+            running_pred_cluster_counts = final_metrics['running_pred_cluster_counts']
+            running_true_cluster_counts = final_metrics['running_true_cluster_counts']
+
             if true_cluster_diff < best_cluster_diff:
                 best_cluster_diff_labels = final_predictions
                 logger.info(f"NEW BEST CLUSTER DIFF – diff +/-{true_cluster_diff} (Threshold: {threshold})")
                 best_cluster_diff = true_cluster_diff
                 best_threshold = threshold
+                best_cluster_running_metrics = {
+                    'running_ari': running_ari,
+                    'running_nmi': running_nmi,
+                    'running_true_cluster_counts': running_true_cluster_counts,
+                    'running_pred_cluster_counts': running_pred_cluster_counts
+                }
+
 
             if final_ari > best_ari:
                 logger.info(f"NEW BEST ARI – {final_ari} (Threshold: {threshold})")
                 best_ari_labels = final_predictions
                 best_ari = final_ari
                 best_ari_threshold = threshold
+                best_ari_running_metrics = {
+                    'running_ari': running_ari,
+                    'running_nmi': running_nmi,
+                    'running_pred_cluster_counts': running_pred_cluster_counts,
+                    'running_true_cluster_counts': running_true_cluster_counts,
+                }
 
             if final_nmi > best_nmi:
                 logger.info(f"NEW BEST NMI – {final_nmi} (Threshold: {threshold})")
                 best_nmi_labels = final_predictions
                 best_nmi = final_nmi
                 best_nmi_threshold = threshold
+                best_nmi_running_metrics = {
+                    'running_ari': running_ari,
+                    'running_nmi': running_nmi,
+                    'running_pred_cluster_counts': running_pred_cluster_counts,
+                    'running_true_cluster_counts': running_true_cluster_counts,
+                }
 
             end_time = time.time()
             logger.info(f"Run #{idx} duration: {end_time - start_time} seconds")
@@ -188,6 +215,25 @@ def main(config: DictConfig):
             titles=titles,
             show_plot=True # Set to True if you want to see the plot interactively
         )
+
+        # Visualize metrics trends
+        metrics_data = [
+            (best_cluster_running_metrics, "best_cluster", best_threshold),
+            (best_ari_running_metrics, "best_ari", best_ari_threshold),
+            (best_nmi_running_metrics, "best_nmi", best_nmi_threshold)
+        ]
+
+        for metrics, metric_type, threshold in metrics_data:
+            if metrics:  # Only create plot if metrics data exists
+                save_path = f"visuals/{metric_type}/trailing_trends_{date_string}.png"
+                from src.utils import visualize_clustering_metrics
+                visualize_clustering_metrics(
+                    running_metrics=metrics,
+                    metric_type=metric_type,
+                    threshold=threshold,
+                    save_path=save_path,
+                    show_plot=False
+                )
 
     wand_logger.finish(exit_code=0)
 

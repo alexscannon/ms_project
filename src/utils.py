@@ -387,3 +387,86 @@ def visualize_clusters(
             plt.show()
 
         plt.close() # Close the figure to free up memory
+
+
+        plt.close() # Close the figure to free up memory
+
+
+def visualize_clustering_metrics(
+    running_metrics: Dict[str, List],
+    metric_type: str,
+    threshold: float,
+    save_path: str,
+    show_plot: bool = True
+):
+    """
+    Visualizes clustering metrics trends with three subplots.
+
+    Args:
+        running_metrics (Dict[str, List]): Dictionary containing the running metrics
+        metric_type (str): Type of metric ('best_cluster', 'best_ari', 'best_nmi')
+        threshold (float): The threshold value used
+        save_path (str): Path to save the plot
+        show_plot (bool): Whether to display the plot
+    """
+    # Extract metrics
+    running_ari = running_metrics.get('running_ari', [])
+    running_nmi = running_metrics.get('running_nmi', [])
+    running_pred_cluster_counts = running_metrics.get('running_pred_cluster_counts', [])
+    running_true_cluster_counts = running_metrics.get('running_true_cluster_counts', [])
+
+    # Create samples processed axis
+    samples_processed = list(range(100, len(running_ari) * 100 + 100, 100))[:len(running_ari)]
+
+    # Create figure with subplots
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+
+    # Plot 1: Cluster counts comparison
+    ax1.plot(samples_processed, running_true_cluster_counts,
+             label='True Cluster Count', marker='o', markersize=3)
+    ax1.plot(samples_processed, running_pred_cluster_counts,
+             label='Predicted Cluster Count', marker='s', markersize=3)
+    ax1.set_xlabel('Samples Processed')
+    ax1.set_ylabel('Number of Clusters')
+    ax1.set_title('True vs Predicted Cluster Counts')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Plot 2: Running NMI
+    ax2.plot(samples_processed, running_nmi, color='green', marker='o', markersize=3)
+    ax2.set_xlabel('Samples Processed')
+    ax2.set_ylabel('NMI Score')
+    ax2.set_title('Running Normalized Mutual Information (NMI)')
+    ax2.grid(True, alpha=0.3)
+
+    # Plot 3: Running ARI
+    ax3.plot(samples_processed, running_ari, color='red', marker='o', markersize=3)
+    ax3.set_xlabel('Samples Processed')
+    ax3.set_ylabel('ARI Score')
+    ax3.set_title('Running Adjusted Rand Index (ARI)')
+    ax3.grid(True, alpha=0.3)
+
+    # Plot 4: ARI vs NMI comparison
+    ax4.plot(samples_processed, running_ari,
+             label='ARI', color='red', marker='o', markersize=3)
+    ax4.plot(samples_processed, running_nmi,
+             label='NMI', color='green', marker='s', markersize=3)
+    ax4.set_xlabel('Samples Processed')
+    ax4.set_ylabel('Score')
+    ax4.set_title('ARI vs NMI Comparison')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+
+    # Main title
+    plt.suptitle(f'Clustering Metrics Trends (Best {metric_type.replace("best_", "").upper()})\nThreshold: {threshold}', fontsize=16, fontweight='bold')
+    plt.tight_layout()
+
+    # Save plot
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    logger.info(f"Clustering metrics trends saved to {save_path}")
+
+    # Show plot if requested
+    if show_plot:
+        plt.show()
+
+    plt.close()
